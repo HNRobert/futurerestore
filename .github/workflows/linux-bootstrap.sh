@@ -28,11 +28,23 @@ curl -sO https://cdn.cryptiiiic.com/deps/static/Linux/x86_64/Linux_x86_64_Releas
 curl -sO https://cdn.cryptiiiic.com/deps/static/Linux/x86_64/Linux_x86_64_Debug_Latest.tar.zst &
 curl -sLO https://github.com/Kitware/CMake/releases/download/v3.23.2/cmake-3.23.2-linux-x86_64.tar.gz &
 wait
+# Check if dependency files were downloaded successfully
+if [ ! -f "Linux_x86_64_Release_Latest.tar.zst" ]; then
+    echo "Error: Failed to download Linux_x86_64_Release_Latest.tar.zst"
+    echo "Installing dependencies via apt instead..."
+    apt-get install --no-install-recommends -yqq libplist-dev libimobiledevice-dev libusbmuxd-dev libimobiledevice-glue-dev libirecovery-dev libzip-dev libssl-dev libcurl4-openssl-dev
+fi
 rm -rf ${DEP_ROOT}/{lib,include} || true
 mkdir -p ${DEP_ROOT}/Linux_x86_64_{Release,Debug}
-tar xf Linux_x86_64_Release_Latest.tar.zst -C ${DEP_ROOT}/Linux_x86_64_Release &
-tar xf Linux_x86_64_Debug_Latest.tar.zst -C ${DEP_ROOT}/Linux_x86_64_Debug &
-tar xf linux_fix.tar.zst -C ${TMPDIR}/Builder &
+if [ -f "Linux_x86_64_Release_Latest.tar.zst" ]; then
+    tar xf Linux_x86_64_Release_Latest.tar.zst -C ${DEP_ROOT}/Linux_x86_64_Release &
+fi
+if [ -f "Linux_x86_64_Debug_Latest.tar.zst" ]; then
+    tar xf Linux_x86_64_Debug_Latest.tar.zst -C ${DEP_ROOT}/Linux_x86_64_Debug &
+fi
+if [ -f "linux_fix.tar.zst" ]; then
+    tar xf linux_fix.tar.zst -C ${TMPDIR}/Builder &
+fi
 tar xf cmake-3.23.2-linux-x86_64.tar.gz
 cp -RpP cmake-3.23.2-linux-x86_64/* /usr/local/ || true
 wait
