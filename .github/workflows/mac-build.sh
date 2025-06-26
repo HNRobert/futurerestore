@@ -30,6 +30,5 @@ ln -sf ${DEP_ROOT}/macOS_arm64_Debug/{lib/,include/} ${DEP_ROOT}/
 cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=$(which make) -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++) -DCMAKE_MESSAGE_LOG_LEVEL="WARNING" -G "CodeBlocks - Unix Makefiles" -S ./ -B cmake-build-asan-arm64 -DARCH=arm64 -DNO_PKGCFG=ON -DASAN=OFF
 make -j4 -l4 -C cmake-build-asan-arm64
 
-
 llvm-strip -s cmake-build-release-x86_64/src/futurerestore
 llvm-strip -s cmake-build-release-arm64/src/futurerestore

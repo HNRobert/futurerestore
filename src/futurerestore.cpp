@@ -6,12 +6,12 @@
 //  Copyright © 2016 tihmstar. All rights reserved.
 //
 
-#include <libgeneral/macros.h>
-#include <libgen.h>
-#include <zlib.h>
-#include <utility>
-#include <fstream>
 #include "futurerestore.hpp"
+#include <fstream>
+#include <libgen.h>
+#include <libgeneral/macros.h>
+#include <utility>
+#include <zlib.h>
 
 #ifdef HAVE_LIBIPATCHER
 #include <libipatcher/libipatcher.hpp>
@@ -21,15 +21,15 @@
 
 extern "C" {
 #include "common.h"
-#include "normal.h"
-#include "recovery.h"
 #include "dfu.h"
+#include "download.h"
+#include "endianness.h"
 #include "ipsw.h"
 #include "locking.h"
+#include "normal.h"
+#include "recovery.h"
 #include "restore.h"
-#include "endianness.h"
 #include "tsschecker.h"
-#include "download.h"
 #include <zip.h>
 }
 
@@ -50,16 +50,16 @@ void safe_mkdir(const char *path, int mode) {
 #else
     std::ifstream osReleaseStream(std::string("/etc/os-release"), std::ios::in | std::ios::binary);
     std::string osRelease;
-    if(osReleaseStream.good()) {
+    if (osReleaseStream.good()) {
         osRelease.reserve(futurerestore::getFileSize(std::string("/etc/os-release")));
         osRelease.assign((std::istreambuf_iterator<char>(osReleaseStream)), std::istreambuf_iterator<char>());
         if ((osReleaseStream.good())) {
             int pos = osRelease.find(std::string("\nID="));
-            if(pos != std::string::npos) {
+            if (pos != std::string::npos) {
                 osRelease.erase(0, pos + 4);
                 pos = osRelease.find('\n');
                 osRelease.erase(pos, osRelease.length());
-                if(std::equal(osRelease.begin(), osRelease.end(), std::string("ubuntu").end())) {
+                if (std::equal(osRelease.begin(), osRelease.end(), std::string("ubuntu").end())) {
                     if (getuid() == 999) {
                         newID = 999;
                     }
@@ -72,14 +72,14 @@ void safe_mkdir(const char *path, int mode) {
     int id1 = (int)getgid();
     int id2 = (int)geteuid();
     int id3 = (int)getegid();
-    if(newID > -1) {
+    if (newID > -1) {
         setuid(newID);
         setgid(newID);
         seteuid(newID);
         setegid(newID);
     }
     __mkdir(path, mode);
-    if(newID > -1) {
+    if (newID > -1) {
         setuid(id);
         setgid(id1);
         seteuid(id2);
@@ -115,33 +115,33 @@ std::string sepTempPath = futurerestoreTempPath + "/sep.im4p";
 std::string sepManifestTempPath = futurerestoreTempPath + "/sepManifest.plist";
 
 #ifdef __APPLE__
+#include <CommonCrypto/CommonDigest.h>
 #include <sys/sysctl.h>
-#   include <CommonCrypto/CommonDigest.h>
 
-#   define SHA1(d, n, md) CC_SHA1(d, n, md)
-#   define SHA_CTX CC_SHA1_CTX
-#   define SHA1_Init(c) CC_SHA1_Init(c)
-#   define SHA1_Final(md, c) CC_SHA1_Final(md, c)
-#   define SHA1_Update(c, d, l) CC_SHA1_Update(c, d, l)
-#   define SHA256(d, n, md) CC_SHA256(d, n, md)
-#   define SHA256_CTX CC_SHA256_CTX
-#   define SHA256_Init(c) CC_SHA256_Init(c)
-#   define SHA256_Final(md, c) CC_SHA256_Final(md, c)
-#   define SHA256_Update(c, d, l) CC_SHA256_Update(c, d, l)
-#   define SHA384(d, n, md) CC_SHA384(d, n, md)
-#   define SHA384_Init(c) CC_SHA384_Init(c)
-#   define SHA384_Final(md, c) CC_SHA384_Final(md, c)
-#   define SHA384_Update(c, d, l) CC_SHA384_Update(c, d, l)
-#   define SHA512(d, n, md) CC_SHA512(d, n, md)
-#   define SHA512_CTX CC_SHA512_CTX
-#   define SHA512_Init(c) CC_SHA512_Init(c)
-#   define SHA512_Final(md, c) CC_SHA512_Final(md, c)
-#   define SHA512_Update(c, d, l) CC_SHA512_Update(c, d, l)
+#define SHA1(d, n, md) CC_SHA1(d, n, md)
+#define SHA_CTX CC_SHA1_CTX
+#define SHA1_Init(c) CC_SHA1_Init(c)
+#define SHA1_Final(md, c) CC_SHA1_Final(md, c)
+#define SHA1_Update(c, d, l) CC_SHA1_Update(c, d, l)
+#define SHA256(d, n, md) CC_SHA256(d, n, md)
+#define SHA256_CTX CC_SHA256_CTX
+#define SHA256_Init(c) CC_SHA256_Init(c)
+#define SHA256_Final(md, c) CC_SHA256_Final(md, c)
+#define SHA256_Update(c, d, l) CC_SHA256_Update(c, d, l)
+#define SHA384(d, n, md) CC_SHA384(d, n, md)
+#define SHA384_Init(c) CC_SHA384_Init(c)
+#define SHA384_Final(md, c) CC_SHA384_Final(md, c)
+#define SHA384_Update(c, d, l) CC_SHA384_Update(c, d, l)
+#define SHA512(d, n, md) CC_SHA512(d, n, md)
+#define SHA512_CTX CC_SHA512_CTX
+#define SHA512_Init(c) CC_SHA512_Init(c)
+#define SHA512_Final(md, c) CC_SHA512_Final(md, c)
+#define SHA512_Update(c, d, l) CC_SHA512_Update(c, d, l)
 #else
-#   include <openssl/sha.h>
+#include <openssl/sha.h>
 extern "C" {
-    unsigned char *SHA1(const unsigned char *d, size_t n, unsigned char *md);
-    unsigned char *SHA256(const unsigned char *d, size_t n, unsigned char *md);
+unsigned char *SHA1(const unsigned char *d, size_t n, unsigned char *md);
+unsigned char *SHA256(const unsigned char *d, size_t n, unsigned char *md);
 }
 #endif // __APPLE__
 
@@ -155,13 +155,13 @@ using namespace tihmstar;
 extern "C" {
 void irecv_event_cb(const irecv_device_event_t *event, void *userdata);
 void idevice_event_cb(const idevice_event_t *event, void *userdata);
+int received_cb(irecv_client_t client, const irecv_event_t *event);
 }
 
 #pragma mark futurerestore
 
 futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, bool setNonce, bool serial,
-                             bool noRestore, bool noRSEP) : _isUpdateInstall(isUpdateInstall), _isPwnDfu(isPwnDfu), _noIBSS(noIBSS),
-                                               _setNonce(setNonce), _serial(serial), _noRestore(noRestore), _noRSEP(noRSEP) {
+                             bool noRestore, bool noRSEP) : _isUpdateInstall(isUpdateInstall), _isPwnDfu(isPwnDfu), _noIBSS(noIBSS), _setNonce(setNonce), _serial(serial), _noRestore(noRestore), _noRSEP(noRSEP) {
     _client = idevicerestore_client_new();
     retassure(_client != nullptr, "Could not create idevicerestore client\n");
 #ifdef WIN32
@@ -170,14 +170,14 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
     struct stat st{0};
 #endif
     char *tmpdir = std::getenv("TMPDIR");
-    if(tmpdir != nullptr ) {
+    if (tmpdir != nullptr) {
         std::string TMPDIR(tmpdir);
 #ifdef WIN32
-        if(!TMPDIR.empty() && _stat64(tmpdir, &st) > -1) {
+        if (!TMPDIR.empty() && _stat64(tmpdir, &st) > -1) {
 #else
-        if(!TMPDIR.empty() && stat(tmpdir, &st) > -1) {
+        if (!TMPDIR.empty() && stat(tmpdir, &st) > -1) {
 #endif
-            futurerestoreTempPath = TMPDIR +"/futurerestore";
+            futurerestoreTempPath = TMPDIR + "/futurerestore";
             roseTempPath = futurerestoreTempPath + "/rose.bin";
             seTempPath = futurerestoreTempPath + "/se.sefw";
             veridianDGMTempPath = futurerestoreTempPath + "/veridianDGM.der";
@@ -197,9 +197,11 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
         }
     }
 #ifdef WIN32
-    if (_stat64(futurerestoreTempPath.c_str(), &st) == -1) safe_mkdir(futurerestoreTempPath.c_str(), 0755);
+    if (_stat64(futurerestoreTempPath.c_str(), &st) == -1)
+        safe_mkdir(futurerestoreTempPath.c_str(), 0755);
 #else
-    if (stat(futurerestoreTempPath.c_str(), &st) == -1) safe_mkdir(futurerestoreTempPath.c_str(), 0755);
+    if (stat(futurerestoreTempPath.c_str(), &st) == -1)
+        safe_mkdir(futurerestoreTempPath.c_str(), 0755);
 #endif
 
 // TODO: implement windows CI and enable update check
@@ -207,7 +209,7 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
     this->checkForUpdates();
 #endif
 
-    nocache = 1; //tsschecker nocache
+    nocache = 1; // tsschecker nocache
     _foundnonce = -1;
     _useCustomLatest = false;
     _useCustomLatestBuildID = false;
@@ -217,8 +219,9 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
 }
 
 bool futurerestore::init() {
-    if (_didInit) return _didInit;
-//    If device is in an invalid state, don't check if it supports img4
+    if (_didInit)
+        return _didInit;
+    //    If device is in an invalid state, don't check if it supports img4
     if ((_didInit = check_mode(_client) != _MODE_UNKNOWN)) {
         if (!(_client->image4supported = is_image4_supported(_client))) {
             info("[INFO] 32-bit device detected\n");
@@ -226,10 +229,10 @@ bool futurerestore::init() {
             info("[INFO] 64-bit device detected\n");
         }
     }
-    if(_client) {
+    if (_client) {
         dfu_client_free(_client);
     }
-    if(_client) {
+    if (_client) {
         recovery_client_free(_client);
     }
     getDeviceMode(true);
@@ -267,7 +270,7 @@ void futurerestore::putDeviceIntoRecovery() {
     if (_client->mode == MODE_NORMAL) {
         irecv_device_event_subscribe(&_client->irecv_e_ctx, irecv_event_cb, _client);
         idevice_event_subscribe(idevice_event_cb, _client);
-        _client->idevice_e_ctx = (void *) idevice_event_cb;
+        _client->idevice_e_ctx = (void *)idevice_event_cb;
 #ifdef HAVE_LIBIPATCHER
         retassure(!_isPwnDfu, "isPwnDfu enabled, but device was found in normal mode\n");
 #endif
@@ -277,21 +280,21 @@ void futurerestore::putDeviceIntoRecovery() {
     } else if (_client->mode == MODE_RECOVERY) {
         info("Device already in recovery mode\n");
     } else if (_client->mode == MODE_DFU && _isPwnDfu &&
-               #ifdef HAVE_LIBIPATCHER
+#ifdef HAVE_LIBIPATCHER
                true
 #else
-        false
+               false
 #endif
-            ) {
+    ) {
         info("requesting to get into pwnRecovery later\n");
     } else if (!_client->image4supported) {
         info("32-bit device in DFU mode found, assuming user wants to use iOS 9.x re-restore bug. Not failing here\n");
     } else {
         reterror("unsupported device mode, please put device in recovery or normal mode\n");
     }
-    safeFree(_client->udid); //only needs to be freed manually when function didn't throw exception
+    safeFree(_client->udid); // only needs to be freed manually when function didn't throw exception
 
-    //these get also freed by destructor
+    // these get also freed by destructor
     dfu_client_free(_client);
     recovery_client_free(_client);
 }
@@ -323,7 +326,7 @@ plist_t futurerestore::nonceMatchesApTickets() {
     }
 
     unsigned char *realnonce;
-    int realNonceSize = 0;
+    unsigned int realNonceSize = 0;
     if (_rerestoreiOS9) {
         info("Skipping ApNonce check\n");
     } else {
@@ -332,7 +335,7 @@ plist_t futurerestore::nonceMatchesApTickets() {
         info("Got ApNonce from device: ");
         int i = 0;
         for (i = 0; i < realNonceSize; i++) {
-            info("%02x ", ((unsigned char *) realnonce)[i]);
+            info("%02x ", ((unsigned char *)realnonce)[i]);
         }
         info("\n");
     }
@@ -350,22 +353,19 @@ plist_t futurerestore::nonceMatchesApTickets() {
             size_t ticketNonceSize = 0;
             const char *nonce = nullptr;
             try {
-                //nonce might not exist, which we use in re-restoring iOS 9.x for 32-bit
+                // nonce might not exist, which we use in re-restoring iOS 9.x for 32-bit
                 auto n = getNonceFromSCAB(_im4ms[i].first, _im4ms[i].second);
                 ticketNonceSize = n.second;
                 nonce = n.first;
-            } catch (...) {}
+            } catch (...) {
+            }
             if (memcmp(realnonce, nonce, ticketNonceSize) == 0 &&
                 ((ticketNonceSize == realNonceSize && realNonceSize + ticketNonceSize > 0) ||
                  (!ticketNonceSize && *_client->version == '9' &&
                   (getDeviceMode(false) == _MODE_DFU ||
                    (getDeviceMode(false) == _MODE_RECOVERY &&
-                    !strncmp(getiBootBuild(), "iBoot-2817", strlen("iBoot-2817")))
-                  )
-                 )
-                )
-                    )
-                //either nonce needs to match or using re-restore bug in iOS 9.x
+                    !strncmp(getiBootBuild(), "iBoot-2817", strlen("iBoot-2817")))))))
+                // either nonce needs to match or using re-restore bug in iOS 9.x
                 return _aptickets[i];
         }
     }
@@ -379,30 +379,31 @@ std::pair<const char *, size_t> futurerestore::nonceMatchesIM4Ms() {
     retassure(getDeviceMode(true) == _MODE_RECOVERY, "Device is not in recovery mode, can't check ApNonce\n");
 
     unsigned char *realnonce;
-    int realNonceSize = 0;
+    unsigned int realNonceSize = 0;
     recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
 
     std::vector<const char *> nonces;
 
     if (_client->image4supported) {
-        for (auto &_im4m: _im4ms) {
+        for (auto &_im4m : _im4ms) {
             auto nonce = img4tool::getValFromIM4M({_im4m.first, _im4m.second}, 'BNCH');
             if (nonce.payloadSize() == realNonceSize && memcmp(realnonce, nonce.payload(), realNonceSize) == 0)
                 return _im4m;
         }
     } else {
-        for (auto &_im4m: _im4ms) {
+        for (auto &_im4m : _im4ms) {
             size_t ticketNonceSize = 0;
             const char *nonce = nullptr;
             try {
-                //nonce might not exist, which we use in re-restoring iOS 9.x for 32-bit
+                // nonce might not exist, which we use in re-restoring iOS 9.x for 32-bit
                 auto n = getNonceFromSCAB(_im4m.first, _im4m.second);
                 ticketNonceSize = n.second;
                 nonce = n.first;
             } catch (...) {
                 //
             }
-            if (memcmp(realnonce, nonce, ticketNonceSize) == 0) return _im4m;
+            if (memcmp(realnonce, nonce, ticketNonceSize) == 0)
+                return _im4m;
         }
     }
 
@@ -414,13 +415,13 @@ void futurerestore::waitForNonce(std::vector<const char *> nonces, size_t nonceS
     setAutoboot(false);
 
     unsigned char *realnonce;
-    int realNonceSize = 0;
+    unsigned int realNonceSize = 0;
 
-    for (auto nonce: nonces) {
+    for (auto nonce : nonces) {
         info("waiting for ApNonce: ");
         int i = 0;
         for (i = 0; i < nonceSize; i++) {
-            info("%02x ", ((unsigned char *) nonce)[i]);
+            info("%02x ", ((unsigned char *)nonce)[i]);
         }
         info("\n");
     }
@@ -431,7 +432,8 @@ void futurerestore::waitForNonce(std::vector<const char *> nonces, size_t nonceS
             recovery_client_free(_client);
             usleep(1 * USEC_PER_SEC);
         }
-        while (getDeviceMode(true) != _MODE_RECOVERY) usleep(USEC_PER_SEC * 0.5);
+        while (getDeviceMode(true) != _MODE_RECOVERY)
+            usleep(USEC_PER_SEC * 0.5);
         retassure(!recovery_client_new(_client), "Could not connect to device in recovery mode\n");
 
         recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
@@ -441,7 +443,8 @@ void futurerestore::waitForNonce(std::vector<const char *> nonces, size_t nonceS
         }
         info("\n");
         for (int i = 0; i < nonces.size(); i++) {
-            if (memcmp(realnonce, (unsigned const char *) nonces[i], realNonceSize) == 0) _foundnonce = i;
+            if (memcmp(realnonce, (unsigned const char *)nonces[i], realNonceSize) == 0)
+                _foundnonce = i;
         }
     } while (_foundnonce == -1);
     info("Device has requested ApNonce now\n");
@@ -457,20 +460,20 @@ void futurerestore::waitForNonce() {
 
     retassure(_client->image4supported, "Error: ApNonce collision function is not supported on 32-bit devices\n");
 
-    for (auto im4m: _im4ms) {
+    for (auto im4m : _im4ms) {
         auto nonce = img4tool::getValFromIM4M({im4m.first, im4m.second}, 'BNCH');
         if (!nonceSize) {
             nonceSize = nonce.payloadSize();
         }
         retassure(nonceSize == nonce.payloadSize(), "Nonces have different lengths!");
-        nonces.push_back((const char *) nonce.payload());
+        nonces.push_back((const char *)nonce.payload());
     }
 
     waitForNonce(nonces, nonceSize);
 }
 
 void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths) {
-    for (auto apticketPath: apticketPaths) {
+    for (auto apticketPath : apticketPaths) {
         plist_t apticket = nullptr;
         char *im4m = nullptr;
 #ifdef WIN32
@@ -487,7 +490,7 @@ void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths
         gzFile zf = gzopen(apticketPath, "rb");
         if (zf) {
             int blen = 0;
-            int readsize = 16384; //0x4000
+            int readsize = 16384; // 0x4000
             int bufsize = readsize;
             std::allocator<uint8_t> alloc;
             char *bin = (char *)alloc.allocate(bufsize);
@@ -503,7 +506,7 @@ void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths
                     }
                 }
                 bufsize += readsize;
-                bin = (char *) realloc(bin, bufsize);
+                bin = (char *)realloc(bin, bufsize);
                 p = bin + blen;
             } while (!gzeof(zf));
             gzclose(zf);
@@ -578,15 +581,15 @@ getIPSWComponent(struct idevicerestore_client_t *client, plist_t build_identity,
     unsigned char *component_data = nullptr;
     unsigned int component_size = 0;
 
-    if (!(char *) path) {
+    if (!(char *)path) {
         retassure(!build_identity_get_component_path(build_identity, component.c_str(), &path),
                   "ERROR: Unable to get path for component '%s'\n", component.c_str());
     }
 
-    retassure(!extract_component(client->ipsw, (char *) path, &component_data, &component_size),
+    retassure(!extract_component(client->ipsw, (char *)path, &component_data, &component_size),
               "ERROR: Unable to extract component: %s\n", component.c_str());
 
-    return {(char *) component_data, component_size};
+    return {(char *)component_data, component_size};
 }
 
 void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootargs) {
@@ -611,7 +614,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
     /* Assure device is in dfu */
     irecv_device_event_subscribe(&_client->irecv_e_ctx, irecv_event_cb, _client);
     idevice_event_subscribe(idevice_event_cb, _client);
-    _client->idevice_e_ctx = (void *) idevice_event_cb;
+    _client->idevice_e_ctx = (void *)idevice_event_cb;
     getDeviceMode(true);
     mutex_lock(&_client->device_event_mutex);
     cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 1000);
@@ -642,9 +645,9 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             fseek(ibss, 0, SEEK_END);
             iBSS.second = ftell(ibss);
             fseek(ibss, 0, SEEK_SET);
-            retassure(iBSS.first = (char *)alloc.allocate(iBSS.second), "failed to allocate memory for Rose\n");
+            retassure(iBSS.first = (char *)alloc.allocate(iBSS.second), "failed to allocate memory for iBSS\n");
             size_t freadRet = 0;
-            retassure((freadRet = fread((char *) iBSS.first, 1, iBSS.second, ibss)) == iBSS.second,
+            retassure((freadRet = fread((char *)iBSS.first, 1, iBSS.second, ibss)) == iBSS.second,
                       "failed to load iBSS. size=%zu but fread returned %zu\n", iBSS.second, freadRet);
             fclose(ibss);
             cache1 = true;
@@ -654,9 +657,9 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             fseek(ibec, 0, SEEK_END);
             iBEC.second = ftell(ibec);
             fseek(ibec, 0, SEEK_SET);
-            retassure(iBEC.first = (char *)alloc.allocate(iBEC.second), "failed to allocate memory for Rose\n");
+            retassure(iBEC.first = (char *)alloc.allocate(iBEC.second), "failed to allocate memory for iBEC\n");
             size_t freadRet = 0;
-            retassure((freadRet = fread((char *) iBEC.first, 1, iBEC.second, ibec)) == iBEC.second,
+            retassure((freadRet = fread((char *)iBEC.first, 1, iBEC.second, ibec)) == iBEC.second,
                       "failed to load iBEC. size=%zu but fread returned %zu\n", iBEC.second, freadRet);
             fclose(ibec);
             cache2 = true;
@@ -668,22 +671,19 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         try {
             std::string board = getDeviceBoardNoCopy();
             info("Getting firmware keys for: %s\n", board.c_str());
-            if (board == "n71ap" || board == "n71map" || board == "n69ap" || board == "n69uap" || board == "n66ap" ||
-                board == "n66map") {
+            if (board == "n71ap" || board == "n71map" || board == "n69ap" || board == "n69uap" || board == "n66ap" || board == "n66map") {
                 if (!_noIBSS && !cache1) {
-                    iBSSKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBSS",
-                                                           board);
+                    iBSSKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBSS", 0, board);
                 }
                 if (!cache2) {
-                    iBECKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBEC",
-                                                           board);
+                    iBECKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBEC", 0, board);
                 }
             } else {
                 if (!_noIBSS && !cache1) {
-                    iBSSKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBSS");
+                    iBSSKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBSS", 0);
                 }
                 if (!cache2) {
-                    iBECKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBEC");
+                    iBECKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBEC", 0);
                 }
             }
         } catch (tihmstar::exception &e) {
@@ -694,12 +694,12 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
     if (!iBSS.first && !_noIBSS) {
         info("Patching iBSS\n");
         iBSS = getIPSWComponent(_client, build_identity, "iBSS");
-        iBSS = std::move(libipatcher::patchiBSS((char *) iBSS.first, iBSS.second, iBSSKeys));
+        iBSS = std::move(libipatcher::patchiBSS((char *)iBSS.first, iBSS.second, iBSSKeys));
     }
     if (!iBEC.first) {
         info("Patching iBEC\n");
         iBEC = getIPSWComponent(_client, build_identity, "iBEC");
-        iBEC = std::move(libipatcher::patchiBEC((char *) iBEC.first, iBEC.second, iBECKeys, std::move(bootargs)));
+        iBEC = std::move(libipatcher::patchiBEC((char *)iBEC.first, iBEC.second, iBECKeys, std::move(bootargs)));
     }
 
     if (_client->image4supported) {
@@ -732,8 +732,8 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         /* send iBSS */
         info("Sending %s (%lu bytes)...\n", "iBSS", iBSS.second);
         mutex_lock(&_client->device_event_mutex);
-        err = irecv_send_buffer(_client->dfu->client, (unsigned char *) (char *) iBSS.first,
-                                (unsigned long) iBSS.second, 1);
+        err = irecv_send_buffer(_client->dfu->client, (unsigned char *)(char *)iBSS.first,
+                                (unsigned long)iBSS.second, 1);
         retassure(err == IRECV_E_SUCCESS, "ERROR: Unable to send %s component: %s\n", "iBSS", irecv_strerror(err));
 
         info("Booting iBSS, waiting for device to disconnect...\n");
@@ -758,8 +758,8 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             /* send iBEC */
             info("Sending %s (%lu bytes)...\n", "iBEC", iBEC.second);
             mutex_lock(&_client->device_event_mutex);
-            err = irecv_send_buffer(_client->dfu->client, (unsigned char *) (char *) iBEC.first,
-                                    (unsigned long) iBEC.second, 1);
+            err = irecv_send_buffer(_client->dfu->client, (unsigned char *)(char *)iBEC.first,
+                                    (unsigned long)iBEC.second, 1);
             retassure(err == IRECV_E_SUCCESS, "ERROR: Unable to send %s component: %s\n", "iBEC", irecv_strerror(err));
 
             info("Booting iBEC, waiting for device to disconnect...\n");
@@ -825,12 +825,11 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         retassure(((recovery_client_new(_client) == IRECV_E_SUCCESS) ||
                    (mutex_unlock(&_client->device_event_mutex), 0)),
                   "Failed to connect to device in Recovery Mode!");
-        if (get_ap_nonce(_client, &_client->nonce, &_client->nonce_size) < 0) {
+        if (get_ap_nonce(_client, &_client->nonce, (unsigned int *)&_client->nonce_size) < 0) {
             reterror("Failed to get apnonce from device!");
         }
 
-        std::string generator = (_setNonce && _custom_nonce != nullptr) ? _custom_nonce : getGeneratorFromSHSH2(
-                _client->tss);
+        std::string generator = (_setNonce && _custom_nonce != nullptr) ? _custom_nonce : getGeneratorFromSHSH2(_client->tss);
 
         if ((_setNonce && _custom_nonce != nullptr) ||
             memcmp(_client->nonce, nonceelem.payload(), _client->nonce_size) != 0) {
@@ -852,8 +851,8 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             /* send iBEC */
             info("Sending %s (%lu bytes)...\n", "iBEC", iBEC.second);
             mutex_lock(&_client->device_event_mutex);
-            err = irecv_send_buffer(_client->dfu->client, (unsigned char *) (char *) iBEC.first,
-                                    (unsigned long) iBEC.second, 1);
+            err = irecv_send_buffer(_client->dfu->client, (unsigned char *)(char *)iBEC.first,
+                                    (unsigned long)iBEC.second, 1);
             retassure(err == IRECV_E_SUCCESS, "ERROR: Unable to send %s component: %s\n", "iBEC", irecv_strerror(err));
             retassure(((irecv_send_command_breq(_client->dfu->client, "go", 1) == IRECV_E_SUCCESS) ||
                        (mutex_unlock(&_client->device_event_mutex), 0)),
@@ -874,7 +873,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Failed to connect to device in Recovery Mode after ApNonce hax!");
             printf("APnonce post-hax:\n");
-            if (get_ap_nonce(_client, &_client->nonce, &_client->nonce_size) < 0) {
+            if (get_ap_nonce(_client, &_client->nonce, (unsigned int *)&_client->nonce_size) < 0) {
                 reterror("Failed to get apnonce from device!");
             }
             assure(!irecv_send_command(_client->recovery->client, "bgcolor 255 255 0"));
@@ -888,8 +887,8 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             /* send iBEC */
             info("Sending %s (%lu bytes)...\n", "iBEC", iBEC.second);
             mutex_lock(&_client->device_event_mutex);
-            err = irecv_send_buffer(_client->dfu->client, (unsigned char *) (char *) iBEC.first,
-                                    (unsigned long) iBEC.second, 1);
+            err = irecv_send_buffer(_client->dfu->client, (unsigned char *)(char *)iBEC.first,
+                                    (unsigned long)iBEC.second, 1);
             retassure(err == IRECV_E_SUCCESS, "ERROR: Unable to send %s component: %s\n", "iBEC", irecv_strerror(err));
             retassure(((irecv_send_command_breq(_client->dfu->client, "go", 1) == IRECV_E_SUCCESS) ||
                        (mutex_unlock(&_client->device_event_mutex), 0)),
@@ -918,15 +917,15 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         uint64_t gen = std::stoull(generator, nullptr, 16);
         auto *nonce = (uint8_t *)alloc.allocate(_client->nonce_size == 32 ? 48 : 20);
         if (_client->nonce_size == 20) {
-            SHA1((unsigned char *) &gen, 8, nonce);
+            SHA1((unsigned char *)&gen, 8, nonce);
         } else if (_client->nonce_size == 32) {
-            SHA384((unsigned char *) &gen, 8, nonce);
+            SHA384((unsigned char *)&gen, 8, nonce);
         } else {
             reterror("Failed to set nonce generator: %s! Unknown nonce size: %d\n", generator.c_str(),
                      _client->nonce_size);
         }
         for (int i = 0; i < _client->nonce_size; i++) {
-            if (*(uint8_t *) (nonce + i) != *(uint8_t *) (_client->nonce + i)) {
+            if (*(uint8_t *)(nonce + i) != *(uint8_t *)(_client->nonce + i)) {
                 reterror("Failed to set nonce generator: %s!\n", generator.c_str());
             }
         }
@@ -943,7 +942,105 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
 
         sleep(2);
     }
-#endif //HAVE_LIBIPATCHER
+#endif // HAVE_LIBIPATCHER
+}
+
+void futurerestore::patchKernel(plist_t build_identity, std::string custom_seed) {
+#ifndef HAVE_LIBIPATCHER
+    reterror("compiled without libipatcher");
+#else
+    libipatcher::fw_key kernelKeys{};
+    libipatcher::fw_key iBECKeys{};
+    std::pair<ptr_smart<char *>, size_t> kernel;
+    FILE *kernel_f = nullptr;
+    int rv;
+    bool cache = false;
+    std::string img3_end(".patched.img3");
+    std::string img4_end(".patched.im4p");
+    std::string kernel_name(futurerestoreTempPath + "/kernel.");
+
+    getDeviceMode(true);
+    kernel_name.append(getDeviceBoardNoCopy());
+    kernel_name.append(".");
+    kernel_name.append(_client->build);
+    if (_client->image4supported) {
+        kernel_name.append(img4_end);
+    } else {
+        kernel_name.append(img3_end);
+    }
+    std::allocator<uint8_t> alloc;
+    if (!_noCache) {
+        kernel_f = fopen(kernel_name.c_str(), "rb");
+        if (kernel_f) {
+            fseek(kernel_f, 0, SEEK_END);
+            kernel.second = ftell(kernel_f);
+            fseek(kernel_f, 0, SEEK_SET);
+            retassure(kernel.first = (char *)alloc.allocate(kernel.second), "failed to allocate memory for kernel\n");
+            size_t freadRet = 0;
+            retassure((freadRet = fread((char *)kernel.first, 1, kernel.second, kernel_f)) == kernel.second,
+                      "failed to load kernel. size=%zu but fread returned %zu\n", kernel.second, freadRet);
+            fclose(kernel_f);
+            cache = true;
+        }
+    }
+
+    /* Patch kernel */
+    if (!cache) {
+        if (_client->build_major < 14) {
+            try {
+                std::string board = getDeviceBoardNoCopy();
+                info("Getting firmware keys for: %s\n", board.c_str());
+                if (board == "n71ap" || board == "n71map" || board == "n69ap" ||
+                    board == "n69uap" || board == "n66ap" || board == "n66map") {
+                    if (!cache) {
+                        kernelKeys = libipatcher::getFirmwareKeyForComponent(
+                            _client->device->product_type, _client->build, "KernelCache",
+                            _client->device->chip_id, board);
+                    }
+                } else {
+                    if (!cache) {
+                        kernelKeys = libipatcher::getFirmwareKeyForComponent(
+                            _client->device->product_type, _client->build, "KernelCache",
+                            _client->device->chip_id);
+                    }
+                }
+            } catch (tihmstar::exception &e) {
+                reterror("getting keys failed with error: %d (%s). Are keys publicly available?",
+                         e.code(), e.what());
+            }
+        }
+        if (!kernel.first) {
+            info("Patching kernel\n");
+            if (_client->kerneldata && _client->kerneldatasize) {
+                kernel = std::make_pair(_client->kerneldata, _client->kerneldatasize);
+            } else {
+                kernel = getIPSWComponent(_client, build_identity, "KernelCache");
+            }
+            // TODO: Re-enable when libipatcher patchKernel function is available
+            // kernel = std::move(libipatcher::patchKernel(
+            //     (char *)kernel.first, kernel.second, kernelKeys, custom_seed));
+            reterror("Kernel patching not available - patchKernel function missing from libipatcher");
+        }
+    }
+
+    //    if (_client->image4supported) {
+    //        /* if this is 64-bit, we need to back IM4P to IMG4
+    //           also due to the nature of iBoot64Patchers sigpatches we need to stich a valid signed im4m to it (but nonce is ignored) */
+    //        if (!cache) {
+    //            info("Repacking patched kernel as IMG4\n");
+    //            kernel = std::move(libipatcher::packIM4PToIMG4(kernel.first, kernel.second, _im4ms[0].first, _im4ms[0].second));
+    //        }
+    //    }
+
+    retassure(kernel_f = fopen(kernel_name.c_str(), "wb"), "can't save patched kernel at %s\n", kernel_name.c_str());
+    retassure(rv = fwrite(kernel.first, kernel.second, 1, kernel_f), "can't save patched kernel at %s\n", kernel_name.c_str());
+    fflush(kernel_f);
+    fclose(kernel_f);
+
+    _client->kerneldatasize = kernel.second;
+    _client->kerneldata = (char *)alloc.allocate(_client->kerneldatasize);
+    memcpy(_client->kerneldata, kernel.first, kernel.second);
+#endif // HAVE_LIBIPATCHER
 }
 
 void get_custom_component(struct idevicerestore_client_t *client, plist_t build_identity, const char *component,
@@ -953,12 +1050,12 @@ void get_custom_component(struct idevicerestore_client_t *client, plist_t build_
 #else
     try {
         auto comp = getIPSWComponent(client, build_identity, component);
-        comp = std::move(libipatcher::decryptFile3((char *) comp.first, comp.second,
-                                              libipatcher::getFirmwareKey(client->device->product_type, client->build,
-                                                                          component)));
-        *data = (unsigned char *) (char *) comp.first;
+        comp = std::move(libipatcher::decryptFile((char *)comp.first, comp.second,
+                                                  libipatcher::getFirmwareKeyForComponent(client->device->product_type, client->build,
+                                                                                          component, client->device->chip_id)));
+        *data = (unsigned char *)(char *)comp.first;
         *size = comp.second;
-        comp.first = NULL; //don't free on destruction
+        comp.first = NULL; // don't free on destruction
     } catch (tihmstar::exception &e) {
         reterror("ERROR: libipatcher failed with reason %d (%s)\n", e.code(), e.what());
     }
@@ -973,27 +1070,32 @@ void futurerestore::doRestore(const char *ipsw) {
     cleanup([&] {
         info("Cleaning up...\n");
         safeFreeCustom(buildmanifest, plist_free);
-        if (delete_fs && filesystem) unlink(filesystem);
+        if (delete_fs && filesystem)
+            unlink(filesystem);
     });
     struct idevicerestore_client_t *client = _client;
     plist_t build_identity = nullptr;
 
-    client->ipsw = strdup(ipsw);
-    if (_noRestore) client->flags |= FLAG_NO_RESTORE;
-    if (_noRSEP) client->flags |= FLAG_NO_RSEP;
-    if (!_isUpdateInstall) client->flags |= FLAG_ERASE;
+    client->ipsw = ipsw_open(ipsw);
+    retassure(client->ipsw, "ERROR: Failed to open IPSW file %s\n", ipsw);
+    if (_noRestore)
+        client->flags |= FLAG_NO_RESTORE;
+    if (_noRSEP)
+        client->flags |= FLAG_NO_RSEP;
+    if (!_isUpdateInstall)
+        client->flags |= FLAG_ERASE;
 
-    if(!client->idevice_e_ctx) {
+    if (!client->idevice_e_ctx) {
         irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, client);
         idevice_event_subscribe(idevice_event_cb, client);
-        client->idevice_e_ctx = (void *) idevice_event_cb;
+        client->idevice_e_ctx = (void *)idevice_event_cb;
     }
 
     mutex_lock(&client->device_event_mutex);
     client->ignore_device_add_events = 0;
     unsigned int timeout = 10000;
     // 1337 epic speed hax
-    if(client->mode != MODE_UNKNOWN) {
+    if (client->mode != MODE_UNKNOWN) {
         timeout = 1;
     }
     cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, timeout);
@@ -1009,9 +1111,6 @@ void futurerestore::doRestore(const char *ipsw) {
     info("Found device in %s mode\n", client->mode->string);
 
     info("Identified device as %s, %s\n", getDeviceBoardNoCopy(), getDeviceModelNoCopy());
-
-    retassure(!access(client->ipsw, F_OK), "ERROR: Firmware file %s does not exist.\n",
-              client->ipsw); // verify if ipsw file exists
 
     info("Extracting BuildManifest from iPSW\n");
     {
@@ -1032,14 +1131,13 @@ void futurerestore::doRestore(const char *ipsw) {
     client->image4supported = is_image4_supported(client);
     info("Device supports Image4: %s\n", (client->image4supported) ? "true" : "false");
 
-    if (_enterPwnRecoveryRequested) //we are in pwnDFU, so we don't need to check nonces
+    if (_enterPwnRecoveryRequested) // we are in pwnDFU, so we don't need to check nonces
         client->tss = _aptickets.at(0);
     else if (!(client->tss = nonceMatchesApTickets()) && !this->_isPwnDfu)
         reterror("Device ApNonce does not match APTicket nonce\n");
 
     plist_dict_remove_item(client->tss, "BBTicket");
     plist_dict_remove_item(client->tss, "BasebandFirmware");
-
 
     if (_enterPwnRecoveryRequested && _client->image4supported) {
         retassure(plist_dict_get_item(_client->tss, "generator"),
@@ -1064,9 +1162,9 @@ void futurerestore::doRestore(const char *ipsw) {
         }
     }
 
-    plist_t manifest = plist_dict_get_item(build_identity, "Manifest"); //this is the buildidentity used for restore
+    plist_t manifest = plist_dict_get_item(build_identity, "Manifest"); // this is the buildidentity used for restore
 
-    printf("checking if the APTicket is valid for this restore...\n"); //if we are in pwnDFU, just use first APTicket. We don't need to check nonces.
+    printf("checking if the APTicket is valid for this restore...\n"); // if we are in pwnDFU, just use first APTicket. We don't need to check nonces.
     auto im4m = (_enterPwnRecoveryRequested || _rerestoreiOS9) ? _im4ms.at(0) : nonceMatchesIM4Ms();
 
     uint64_t deviceEcid = getDeviceEcid();
@@ -1130,7 +1228,8 @@ void futurerestore::doRestore(const char *ipsw) {
             img4tool::printGeneralBuildIdentityInformation(build_identity);
             info("\nBuildIdentity is valid for the APTicket:\n");
 
-            if (ticketIdentity) img4tool::printGeneralBuildIdentityInformation(ticketIdentity), putchar('\n');
+            if (ticketIdentity)
+                img4tool::printGeneralBuildIdentityInformation(ticketIdentity), putchar('\n');
             else {
                 info("IM4M is not valid for any restore within the Buildmanifest\n");
                 info("This APTicket can't be used for restoring this firmware\n");
@@ -1142,7 +1241,12 @@ void futurerestore::doRestore(const char *ipsw) {
             }
         } else {
             if (!img4tool::isIM4MSignatureValid({im4m.first, im4m.second})) {
-                info("IM4M signature is not valid!\n");
+                if (_skipBlob) {
+                    info("[WARNING] NOT VALIDATING SHSH BLOBS!\n");
+                } else {
+                    info("IM4M signature is not valid!\n");
+                    reterror("APTicket can't be used for this restore\n");
+                }
             }
             info("Verified APTicket to be valid for this restore\n");
         }
@@ -1198,11 +1302,11 @@ void futurerestore::doRestore(const char *ipsw) {
     }
 
     if (_client->image4supported && !_setNonce) {
-        //check SEP
+        // check SEP
         plist_t sep_manifest = plist_dict_get_item(client->sepBuildIdentity, "Manifest");
         plist_t sep_sep = plist_copy(plist_dict_get_item(sep_manifest, "SEP"));
         plist_dict_set_item(manifest, "SEP", sep_sep);
-        unsigned char genHash[48]; //SHA384 digest length
+        unsigned char genHash[48]; // SHA384 digest length
         ptr_smart<unsigned char *> sephash = NULL;
         uint64_t sephashlen = 20;
         plist_t digest = plist_dict_get_item(sep_sep, "Digest");
@@ -1211,24 +1315,24 @@ void futurerestore::doRestore(const char *ipsw) {
 
         plist_get_data_val(digest, reinterpret_cast<char **>(&sephash), &sephashlen);
         if (sephashlen == 20) {
-            SHA1((unsigned char *) _client->sepfwdata, _client->sepfwdatasize, (unsigned char *)&genHash);
-        }
-        else {
-            SHA384((const unsigned char *) _client->sepfwdata, (uint64_t) _client->sepfwdatasize, genHash);
+            SHA1((unsigned char *)_client->sepfwdata, _client->sepfwdatasize, (unsigned char *)&genHash);
+        } else {
+            SHA384((const unsigned char *)_client->sepfwdata, (uint64_t)_client->sepfwdatasize, genHash);
         }
         retassure(!memcmp(genHash, sephash, sephashlen), "ERROR: SEP does not match sepmanifest\n");
     }
 
     build_identity_print_information(build_identity); // print information about current build identity
 
-    //check for enterpwnrecovery, because we Could be in DFU mode
+    // check for enterpwnrecovery, because we Could be in DFU mode
     if (_enterPwnRecoveryRequested) {
-        retassure((getDeviceMode(true) == _MODE_DFU) || (getDeviceMode(false) == _MODE_RECOVERY && _noIBSS),
+        retassure((getDeviceMode(true) == _MODE_DFU) ||
+                      (getDeviceMode(false) == _MODE_RECOVERY && _noIBSS),
                   "unexpected device mode\n");
-        if(client->irecv_e_ctx) {
+        if (client->irecv_e_ctx) {
             irecv_device_event_unsubscribe(client->irecv_e_ctx);
         }
-        if(client->idevice_e_ctx != nullptr) {
+        if (client->idevice_e_ctx != nullptr) {
             client->idevice_e_ctx = nullptr;
         }
         std::string bootargs;
@@ -1243,18 +1347,28 @@ void futurerestore::doRestore(const char *ipsw) {
                 bootargs.append("nand-enable-reformat=0x1 ");
             }
             bootargs.append(
-                    "-v -restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+                "-restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+        }
+        auto custom_seed = std::getenv("FUTURERESTORE_CUSTOM_CRYPTEX_SEED");
+        if (_client->build_major > 19) {
+            if (custom_seed) {
+                if (strlen(custom_seed) >= 32) {
+                    patchKernel(build_identity, custom_seed);
+                } else {
+                    patchKernel(build_identity, "0x11111111111111111111111111111111");
+                }
+            }
         }
         enterPwnRecovery(build_identity, bootargs);
-        if(_client->irecv_e_ctx) {
+        if (_client->irecv_e_ctx) {
             irecv_device_event_unsubscribe(_client->irecv_e_ctx);
         }
-        if(_client->idevice_e_ctx != nullptr) {
+        if (_client->idevice_e_ctx != nullptr) {
             _client->idevice_e_ctx = nullptr;
         }
         irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, _client);
         idevice_event_subscribe(idevice_event_cb, client);
-        client->idevice_e_ctx = (void *) idevice_event_cb;
+        client->idevice_e_ctx = (void *)idevice_event_cb;
     }
 
     // Get filesystem name from build identity
@@ -1281,11 +1395,11 @@ void futurerestore::doRestore(const char *ipsw) {
         }
         strcpy(tmpf, client->cache_dir);
         strcat(tmpf, "/");
-        char *ipswtmp = strdup(client->ipsw);
+        char *ipswtmp = strdup(ipsw);
         strcat(tmpf, basename(ipswtmp));
         free(ipswtmp);
     } else {
-        strcpy(tmpf, client->ipsw);
+        strcpy(tmpf, ipsw);
     }
     char *p = strrchr(tmpf, '.');
     if (p) {
@@ -1309,7 +1423,7 @@ void futurerestore::doRestore(const char *ipsw) {
     if (stat(tmpf, &st) == 0) {
 #endif
         off_t fssize = 0;
-        ipsw_get_file_size(client->ipsw, fsname, (uint64_t *) &fssize);
+        ipsw_get_file_size(client->ipsw, fsname, (uint64_t *)&fssize);
         if ((fssize > 0) && (st.st_size == fssize)) {
             info("Using cached filesystem from '%s'\n", tmpf);
             filesystem = strdup(tmpf);
@@ -1422,11 +1536,10 @@ void futurerestore::doRestore(const char *ipsw) {
     if (_enterPwnRecoveryRequested) {
         if (!_client->image4supported) {
             if (strncmp(client->version, "10.", 3) ==
-                0)//if pwnrecovery send all components decrypted, unless we're dealing with iOS 10
+                0) // if pwnrecovery send all components decrypted, unless we're dealing with iOS 10
                 client->recovery_custom_component_function = get_custom_component;
         }
     } else if (!_rerestoreiOS9) {
-
         /* now we load the iBEC */
         retassure(!recovery_send_ibec(client, build_identity), "ERROR: Unable to send iBEC\n");
 
@@ -1441,8 +1554,8 @@ void futurerestore::doRestore(const char *ipsw) {
                   "Device did not disconnect. Possibly invalid iBEC. If you're using a USB-C to Lightning cable, switch to USB-A to Lightning (see issue #67)");
 #else
         retassure((client->mode == MODE_UNKNOWN || (mutex_unlock(&client->device_event_mutex), 0)),
-                  "Device did not disconnect. Possibly invalid iBEC. Reset device and try again");  
-#endif  
+                  "Device did not disconnect. Possibly invalid iBEC. Reset device and try again");
+#endif
         mutex_unlock(&client->device_event_mutex);
 
         debug("Waiting for device to reconnect...\n");
@@ -1453,16 +1566,17 @@ void futurerestore::doRestore(const char *ipsw) {
                   "Device did not disconnect. Possibly invalid iBEC. If you're using a USB-C to Lightning cable, switch to USB-A to Lightning (see issue #67)");
 #else
         retassure((client->mode == MODE_RECOVERY || (mutex_unlock(&client->device_event_mutex), 0)),
-                  "Device did not disconnect. Possibly invalid iBEC. Reset device and try again");    
-#endif    
+                  "Device did not disconnect. Possibly invalid iBEC. Reset device and try again");
+#endif
         mutex_unlock(&client->device_event_mutex);
     }
 
     retassure(client->mode == MODE_RECOVERY, "failed to reconnect to device in recovery (iBEC) mode\n");
 
-    //do magic
-    if (_client->image4supported) get_sep_nonce(client, &client->sepnonce, &client->sepnonce_size);
-    get_ap_nonce(client, &client->nonce, &client->nonce_size);
+    // do magic
+    if (_client->image4supported)
+        get_sep_nonce(client, &client->sepnonce, (unsigned int *)&client->sepnonce_size);
+    get_ap_nonce(client, &client->nonce, (unsigned int *)&client->nonce_size);
 
     if (client->mode == MODE_RECOVERY) {
         retassure(client->srnm, "ERROR: Could not retrieve device serial number. Can't continue.\n");
@@ -1471,10 +1585,14 @@ void futurerestore::doRestore(const char *ipsw) {
             retassure(!irecv_send_command(client->recovery->client, "bgcolor 0 255 0"),
                       "ERROR: Unable to set bgcolor\n");
             info("[WARNING] Setting bgcolor to green! If you don't see a green screen, then your device didn't boot iBEC correctly\n");
-            sleep(2); //show the user a green screen!
+            sleep(2); // show the user a green screen!
         }
-
-        retassure(!recovery_enter_restore(client, build_identity), "ERROR: Unable to place device into restore mode\n");
+        irecv_event_subscribe(client->recovery->client, IRECV_RECEIVED, &received_cb, nullptr);
+        auto tmpRet = recovery_enter_restore(client, build_identity);
+        if (tmpRet) {
+            irecv_receive(client->recovery->client);
+        }
+        retassure(!tmpRet, "ERROR: Unable to place device into restore mode\n");
 
         recovery_client_free(client);
     }
@@ -1494,9 +1612,11 @@ void futurerestore::doRestore(const char *ipsw) {
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");
-    int result = restore_device(client, build_identity, filesystem);
-    if (result == 2) return;
-    else retassure(!(result), "ERROR: Unable to restore device\n");
+    int result = restore_device(client, build_identity);
+    if (result == 2)
+        return;
+    else
+        retassure(!(result), "ERROR: Unable to restore device\n");
 }
 
 #ifdef __APPLE__
@@ -1531,11 +1651,11 @@ int futurerestore::findProc(const char *procName, bool load) {
         }
         procs = procs2;
         ctlRet = sysctl(mib, mibLen, procs, &size, nullptr, 0);
-    } while(ctlRet < 0 && errno == ENOMEM);
+    } while (ctlRet < 0 && errno == ENOMEM);
     size_t nprocs = size / sizeof(struct kinfo_proc);
     int pid = 0;
     char *cmd;
-    for(int i = 0; i < nprocs; i++) {
+    for (int i = 0; i < nprocs; i++) {
         if (procs[i].kp_proc.p_stat == SZOMB) {
             continue;
         }
@@ -1584,13 +1704,13 @@ int futurerestore::findProc(const char *procName, bool load) {
         }
 
         /* Strip off any path that was specified */
-        for(cmd = foundProc; (foundProc < &procArgs[sysSize]) && (*foundProc != '\0'); foundProc++) {
+        for (cmd = foundProc; (foundProc < &procArgs[sysSize]) && (*foundProc != '\0'); foundProc++) {
             if (*foundProc == '/') {
                 cmd = foundProc + 1;
             }
         }
         if (strcmp(cmd, procName) == 0) {
-            if(!load) {
+            if (!load) {
                 debug("daemonManager: findProc: found %s!\n", procName);
             }
             return pid;
@@ -1600,12 +1720,12 @@ int futurerestore::findProc(const char *procName, bool load) {
 }
 
 void futurerestore::daemonManager(bool load) {
-    if(!load) {
+    if (!load) {
         debug("daemonManager: suspending invasive macOS daemons...\n");
     }
     int pid = 0;
-    const char *procList[] = { "Spotify", "MobileDeviceUpdater", "AMPDevicesAgent", "AMPDeviceDiscoveryAgent", nullptr};
-    for(int i = 0; i < 3; i++) {
+    const char *procList[] = {"Spotify", "MobileDeviceUpdater", "AMPDevicesAgent", "AMPDeviceDiscoveryAgent", nullptr};
+    for (int i = 0; i < 3; i++) {
         pid = findProc(procList[i], load);
         if (pid > 1) {
             if (load) {
@@ -1617,7 +1737,7 @@ void futurerestore::daemonManager(bool load) {
         }
     }
 
-    if(!load) {
+    if (!load) {
         debug("daemonManager: done!\n");
     }
 }
@@ -1626,7 +1746,7 @@ void futurerestore::daemonManager(bool load) {
 futurerestore::~futurerestore() {
     recovery_client_free(_client);
     idevicerestore_client_free(_client);
-    for (auto im4m: _im4ms) {
+    for (auto im4m : _im4ms) {
         safeFree(im4m.first);
     }
     safeFree(_ibootBuild);
@@ -1638,7 +1758,7 @@ futurerestore::~futurerestore() {
     safeFree(_otaFirmwareTokens);
     safeFree(_latestManifest);
     safeFree(_latestFirmwareUrl);
-    for (auto plist: _aptickets) {
+    for (auto plist : _aptickets) {
         safeFreeCustom(plist, plist_free);
     }
     safeFreeCustom(_sepbuildmanifest, plist_free);
@@ -1650,18 +1770,20 @@ futurerestore::~futurerestore() {
 
 void futurerestore::loadFirmwareTokens() {
     if (!_firmwareTokens) {
-        if (!_firmwareJson) _firmwareJson = getFirmwareJson();
+        if (!_firmwareJson)
+            _firmwareJson = getFirmwareJson();
         retassure(_firmwareJson, "[TSSC] Could not get firmware.json\n");
         long cnt = parseTokens(_firmwareJson, &_firmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "ota" : "firmware");
     }
-    if(!_betaFirmwareTokens && _useCustomLatestBeta) {
-        if (!_betaFirmwareJson) _betaFirmwareJson = getBetaFirmwareJson(getDeviceModelNoCopy());
-        if(!_betaFirmwareJson || strcmp(_betaFirmwareJson, "[]") == 0) {
+    if (!_betaFirmwareTokens && _useCustomLatestBeta) {
+        if (!_betaFirmwareJson)
+            _betaFirmwareJson = getBetaFirmwareJson(getDeviceModelNoCopy());
+        if (!_betaFirmwareJson || strcmp(_betaFirmwareJson, "[]") == 0) {
             info("[TSSC] Could not get betas json, falling back to appledb\n");
             _useAppleDB = true;
             std::string type("iOS");
-            if(std::string(getDeviceModelNoCopy()).find("iPad") != std::string::npos) {
+            if (std::string(getDeviceModelNoCopy()).find("iPad") != std::string::npos) {
                 type = std::string("iPadOS");
             }
             _betaFirmwareJson = getBetaFirmwareJson2(type.c_str(), _customLatestBuildID.c_str());
@@ -1670,8 +1792,9 @@ void futurerestore::loadFirmwareTokens() {
         long cnt = parseTokens(_betaFirmwareJson, &_betaFirmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "beta ota" : "beta firmware");
     }
-    if(!_otaFirmwareTokens && _useCustomLatestOTA) {
-        if (!_otaFirmwareJson) _otaFirmwareJson = getOtaJson();
+    if (!_otaFirmwareTokens && _useCustomLatestOTA) {
+        if (!_otaFirmwareJson)
+            _otaFirmwareJson = getOtaJson();
         retassure(_otaFirmwareJson, "[TSSC] Could not get otas json\n");
         long cnt = parseTokens(_otaFirmwareJson, &_otaFirmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "beta ota" : "beta firmware");
@@ -1679,11 +1802,10 @@ void futurerestore::loadFirmwareTokens() {
 }
 
 const char *futurerestore::getDeviceModelNoCopy() {
-    if(_model) {
+    if (_model) {
         return _model;
     }
     if (!_client->device || !_client->device->product_type) {
-
         int mode = getDeviceMode(true);
         retassure(mode == _MODE_NORMAL || mode == _MODE_RECOVERY || mode == _MODE_DFU, "unexpected device mode=%d\n",
                   mode);
@@ -1708,11 +1830,10 @@ const char *futurerestore::getDeviceModelNoCopy() {
 }
 
 const char *futurerestore::getDeviceBoardNoCopy() {
-    if(_board) {
+    if (_board) {
         return _board;
     }
     if (!_client->device || !_client->device->product_type) {
-
         int mode = getDeviceMode(true);
         retassure(mode == _MODE_NORMAL || mode == _MODE_RECOVERY || mode == _MODE_DFU, "unexpected device mode=%d\n",
                   mode);
@@ -1746,8 +1867,8 @@ char *futurerestore::getLatestManifest() {
         int versionCnt = 0;
         int i = 0;
         char **versions = nullptr;
-        if(_useCustomLatestBuildID) {
-            if(_useCustomLatestOTA) {
+        if (_useCustomLatestBuildID) {
+            if (_useCustomLatestOTA) {
                 versions = getListOfiOSForDevice2(_otaFirmwareTokens, device, 1, &versionCnt, 1,
                                                   _useCustomLatestBeta);
             } else {
@@ -1759,70 +1880,72 @@ char *futurerestore::getLatestManifest() {
         }
         retassure(versionCnt, "[TSSC] failed finding latest firmware version\n");
         char *bpos = nullptr;
-        while ((bpos = strstr((char *) (versVals.version = strdup(versions[i++])), "[B]")) != nullptr) {
-            free((char *) versVals.version);
+        while ((bpos = strstr((char *)(versVals.version = strdup(versions[i++])), "[B]")) != nullptr) {
+            free((char *)versVals.version);
             if (--versionCnt == 0)
                 reterror("[TSSC] automatic selection of firmware Couldn't find for non-beta versions\n");
         }
-        if(_useCustomLatest) {
+        if (_useCustomLatest) {
             i = 0;
-            while(i < versionCnt) {
+            while (i < versionCnt) {
                 versVals.version = strdup(versions[i++]);
                 std::string version(versVals.version);
-                if(!std::equal(_customLatest.begin(), _customLatest.end(), version.begin())) {
-                    free((char *) versVals.version);
+                if (!std::equal(_customLatest.begin(), _customLatest.end(), version.begin())) {
+                    free((char *)versVals.version);
                 } else {
                     i = -1;
                     break;
                 }
             }
-            if(i != -1) {
+            if (i != -1) {
                 reterror("[TSSC] failed to find custom version for device!\n");
             }
-        } else if(!_useCustomLatestBeta && _useCustomLatestBuildID) {
+        } else if (!_useCustomLatestBeta && _useCustomLatestBuildID) {
             i = 0;
             while (i < versionCnt) {
                 versVals.buildID = strdup(versions[i++]);
                 std::string version(versVals.buildID);
                 if (!std::equal(_customLatestBuildID.begin(), _customLatestBuildID.end(), version.begin())) {
-                    free((char *) versVals.buildID);
+                    free((char *)versVals.buildID);
                 } else {
                     i = -1;
                     break;
                 }
             }
-            if(i != -1) {
+            if (i != -1) {
                 reterror("[TSSC] failed to find custom buildid for device!\n");
             }
         }
-        if(!_useCustomLatestBeta) {
-            if(_useCustomLatestBuildID) {
+        if (!_useCustomLatestBeta) {
+            if (_useCustomLatestBuildID) {
                 debug("[TSSC] selecting latest firmware version: %s\n", versVals.buildID);
             } else {
                 debug("[TSSC] selecting latest firmware version: %s\n", versVals.version);
             }
         }
-        if (bpos) *bpos = '\0';
-        if (versions) free(versions[versionCnt - 1]), free(versions);
+        if (bpos)
+            *bpos = '\0';
+        if (versions)
+            free(versions[versionCnt - 1]), free(versions);
 
         ptr_smart<const char *> autofree(
-                versVals.version); //make sure it gets freed after function finishes execution by either reaching end or throwing exception
+            versVals.version); // make sure it gets freed after function finishes execution by either reaching end or throwing exception
         ptr_smart<const char *> autofree2(
-                versVals.buildID); //make sure it gets freed after function finishes execution by either reaching end or throwing exception
+            versVals.buildID); // make sure it gets freed after function finishes execution by either reaching end or throwing exception
 
-        if(_useCustomLatestBeta) {
+        if (_useCustomLatestBeta) {
             debug("[TSSC] selecting latest firmware version: %s\n", _customLatestBuildID.c_str());
-            if(_useCustomLatestOTA) {
+            if (_useCustomLatestOTA) {
                 t_versionURL *urls = getFirmwareUrls(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
-                while(urls && urls++->url) {
+                while (urls && urls++->url) {
                     char *manifeststr = getBuildManifest(urls->url, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
-                    if(!manifeststr) {
+                    if (!manifeststr) {
                         continue;
                     }
                     plist_t manifest = nullptr;
-                    plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &manifest);
+                    plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &manifest);
                     plist_t ident = getBuildidentityWithBoardconfig(manifest, getDeviceBoardNoCopy(), _useCustomLatestOTA);
-                    if(ident) {
+                    if (ident) {
                         _latestFirmwareUrl = urls->url;
                         safeFree(urls->buildID);
                         safeFree(urls->version);
@@ -1832,7 +1955,7 @@ char *futurerestore::getLatestManifest() {
                     safeFree(urls->version);
                 }
             } else {
-                if(_useAppleDB) {
+                if (_useAppleDB) {
                     _latestFirmwareUrl = getBetaURLForDevice2(_betaFirmwareTokens, getDeviceModelNoCopy());
                 } else {
                     _latestFirmwareUrl = getBetaURLForDevice(_betaFirmwareTokens, _customLatestBuildID.c_str());
@@ -1840,18 +1963,18 @@ char *futurerestore::getLatestManifest() {
             }
             _latestManifest = getBuildManifest(_latestFirmwareUrl, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
         } else {
-            if(_useCustomLatestBuildID) {
-                if(_useCustomLatestOTA) {
+            if (_useCustomLatestBuildID) {
+                if (_useCustomLatestOTA) {
                     t_versionURL *urls = getFirmwareUrls(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
-                    while(urls && urls++->url) {
+                    while (urls && urls++->url) {
                         char *manifeststr = getBuildManifest(urls->url, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
-                        if(!manifeststr) {
+                        if (!manifeststr) {
                             continue;
                         }
                         plist_t manifest = nullptr;
-                        plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &manifest);
+                        plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &manifest);
                         plist_t ident = getBuildidentityWithBoardconfig(manifest, getDeviceBoardNoCopy(), _useCustomLatestOTA);
-                        if(ident) {
+                        if (ident) {
                             _latestFirmwareUrl = urls->url;
                             safeFree(urls->buildID);
                             safeFree(urls->version);
@@ -1889,16 +2012,17 @@ void inline futurerestore::test() const {
 void futurerestore::downloadLatestRose() {
     char *manifeststr = getLatestManifest();
     char *roseStr = (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                                                                             "Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                                                                       : nullptr);
     char otaString[1024]{};
     if (roseStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", roseStr);
             roseStr = reinterpret_cast<char *>(&otaString);
         }
         auto *digestString = getDigestOfElementInManifest("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(roseTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
-        if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        if (hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
             info("Using cached Rose\n");
             safeFree(digestString);
             safeFree(hash);
@@ -1914,10 +2038,11 @@ void futurerestore::downloadLatestRose() {
 void futurerestore::downloadLatestSE() {
     char *manifeststr = getLatestManifest();
     char *seStr = (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                                                                                "SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                                                                          : nullptr);
     char otaString[1024]{};
     if (seStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", seStr);
             seStr = reinterpret_cast<char *>(&otaString);
         }
@@ -1932,36 +2057,38 @@ void futurerestore::downloadLatestSE() {
 void futurerestore::downloadLatestSavage() {
     char *manifeststr = getLatestManifest();
     char *savageB0ProdStr = (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                             ? getPathOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
-                                                          0) : nullptr);
+                                 ? getPathOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
+                                                              0)
+                                 : nullptr);
     char *savageB0DevStr = (elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                            : nullptr);
+                                ? getPathOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                : nullptr);
     char *savageB2ProdStr = (elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                             ? getPathOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
-                                                          _useCustomLatestOTA) : nullptr);
+                                 ? getPathOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
+                                                              _useCustomLatestOTA)
+                                 : nullptr);
     char *savageB2DevStr = (elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                            : nullptr);
+                                ? getPathOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                : nullptr);
     char *savageBAProdStr = (elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                             ? getPathOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
-                                                          _useCustomLatestOTA) : nullptr);
+                                 ? getPathOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
+                                                              _useCustomLatestOTA)
+                                 : nullptr);
     char *savageBADevStr = (elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                            : nullptr);
+                                ? getPathOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                : nullptr);
     std::array<std::string, 6> savagePaths{};
-
 
     char otaString[1024]{};
     if (savageB0ProdStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB0ProdStr);
             savageB0ProdStr = reinterpret_cast<char *>(&otaString);
         }
         savagePaths[0] = futurerestoreTempPath + "/savageB0PP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[0], 1);
-        if(hash && digestString && !memcmp(digestString, hash, 32)) {
+        if (hash && digestString && !memcmp(digestString, hash, 32)) {
             info("Using cached Savage,B0-Prod-Patch.\n");
             safeFree(digestString);
             safeFree(hash);
@@ -1973,14 +2100,14 @@ void futurerestore::downloadLatestSavage() {
     }
     memset(otaString, 0, 1024);
     if (savageB0DevStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB0DevStr);
             savageB0DevStr = reinterpret_cast<char *>(&otaString);
         }
         savagePaths[1] = futurerestoreTempPath + "//savageB0DP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[1], 1);
-        if(hash && digestString && !memcmp(digestString, hash, 32)) {
+        if (hash && digestString && !memcmp(digestString, hash, 32)) {
             info("Using cached Savage,B0-Dev-Patch.\n");
             safeFree(digestString);
             safeFree(hash);
@@ -1992,14 +2119,14 @@ void futurerestore::downloadLatestSavage() {
     }
     memset(otaString, 0, 1024);
     if (savageB2ProdStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB2ProdStr);
             savageB2ProdStr = reinterpret_cast<char *>(&otaString);
         }
         savagePaths[2] = futurerestoreTempPath + "//savageB2PP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[2], 1);
-        if(hash && digestString && !memcmp(digestString, hash, 32)) {
+        if (hash && digestString && !memcmp(digestString, hash, 32)) {
             info("Using cached Savage,B2-Prod-Patch.\n");
             safeFree(digestString);
             safeFree(hash);
@@ -2011,14 +2138,14 @@ void futurerestore::downloadLatestSavage() {
     }
     memset(otaString, 0, 1024);
     if (savageB2DevStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB2DevStr);
             savageB2DevStr = reinterpret_cast<char *>(&otaString);
         }
         savagePaths[3] = futurerestoreTempPath + "//savageB2DP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[3], 1);
-        if(hash && digestString && !memcmp(digestString, hash, 32)) {
+        if (hash && digestString && !memcmp(digestString, hash, 32)) {
             info("Using cached Savage,B2-Dev-Patch.\n");
             safeFree(digestString);
             safeFree(hash);
@@ -2030,14 +2157,14 @@ void futurerestore::downloadLatestSavage() {
     }
     memset(otaString, 0, 1024);
     if (savageBAProdStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageBAProdStr);
             savageBAProdStr = reinterpret_cast<char *>(&otaString);
         }
         savagePaths[4] = futurerestoreTempPath + "//savageBAPP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[4], 1);
-        if(hash && digestString && !memcmp(digestString, hash, 32)) {
+        if (hash && digestString && !memcmp(digestString, hash, 32)) {
             info("Using cached Savage,BA-Prod-Patch.\n");
             safeFree(digestString);
             safeFree(hash);
@@ -2049,14 +2176,14 @@ void futurerestore::downloadLatestSavage() {
     }
     memset(otaString, 0, 1024);
     if (savageBADevStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageBADevStr);
             savageBADevStr = reinterpret_cast<char *>(&otaString);
         }
         savagePaths[5] = futurerestoreTempPath + "//savageBADP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[5], 1);
-        if(hash && digestString && !memcmp(digestString, hash, 32)) {
+        if (hash && digestString && !memcmp(digestString, hash, 32)) {
             info("Using cached Savage,BA-Dev-Patch.\n");
             safeFree(digestString);
             safeFree(hash);
@@ -2079,20 +2206,20 @@ void futurerestore::downloadLatestSavage() {
 void futurerestore::downloadLatestVeridian() {
     char *manifeststr = getLatestManifest();
     char *veridianDGMStr = (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                            : nullptr);
+                                ? getPathOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                : nullptr);
     char *veridianFWMStr = (elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                            : nullptr);
+                                ? getPathOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                : nullptr);
     char otaString[1024]{};
     if (veridianDGMStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", veridianDGMStr);
             veridianDGMStr = reinterpret_cast<char *>(&otaString);
         }
         auto *digestString = getDigestOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(veridianDGMTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
-        if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        if (hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
             info("Using cached BMU,DigestMap(Veridian).\n");
             safeFree(digestString);
             safeFree(hash);
@@ -2104,13 +2231,13 @@ void futurerestore::downloadLatestVeridian() {
     }
     memset(otaString, 0, 1024);
     if (veridianFWMStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", veridianFWMStr);
             veridianFWMStr = reinterpret_cast<char *>(&otaString);
         }
         auto digestString = getDigestOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0);
         auto hash = getSHA(veridianFWMTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
-        if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        if (hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
             info("Using cached BMU,FirmwareMap(Veridian).\n");
             safeFree(digestString);
             safeFree(hash);
@@ -2127,10 +2254,11 @@ void futurerestore::downloadLatestVeridian() {
 void futurerestore::downloadLatestTimer() {
     char *manifeststr = getLatestManifest();
     char *timerStr = (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                                                                                       "Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                                                                                 : nullptr);
     char otaString[1024]{};
     if (timerStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", timerStr);
             timerStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2144,10 +2272,11 @@ void futurerestore::downloadLatestTimer() {
 void futurerestore::downloadLatestBaobab() {
     char *manifeststr = getLatestManifest();
     char *baobabStr = (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                                                                               "Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                                                                         : nullptr);
     char otaString[1024]{};
     if (baobabStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", baobabStr);
             baobabStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2162,69 +2291,84 @@ void futurerestore::downloadLatestYonkers() {
     char *manifeststr = getLatestManifest();
     char *yonkers0Str = (elemExists("Yonkers,SysTopPatch0", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                              ? getPathOfElementInManifest("Yonkers,SysTopPatch0", manifeststr, getDeviceBoardNoCopy(),
-                                                          0) : nullptr);
+                                                          0)
+                             : nullptr);
     char *yonkers1Str = (elemExists("Yonkers,SysTopPatch1", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch1", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch1", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers2Str = (elemExists("Yonkers,SysTopPatch2", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch2", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch2", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers3Str = (elemExists("Yonkers,SysTopPatch3", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch3", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch3", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers4Str = (elemExists("Yonkers,SysTopPatch4", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch4", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch4", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers5Str = (elemExists("Yonkers,SysTopPatch5", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch5", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch5", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers6Str = (elemExists("Yonkers,SysTopPatch6", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch6", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch6", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers7Str = (elemExists("Yonkers,SysTopPatch7", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch7", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch7", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers8Str = (elemExists("Yonkers,SysTopPatch8", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch8", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch8", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkers9Str = (elemExists("Yonkers,SysTopPatch9", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatch9", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch9", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkersAStr = (elemExists("Yonkers,SysTopPatchA", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatchA", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatchA", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkersBStr = (elemExists("Yonkers,SysTopPatchB", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatchB", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatchB", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkersCStr = (elemExists("Yonkers,SysTopPatchC", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatchC", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatchC", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkersDStr = (elemExists("Yonkers,SysTopPatchD", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatchD", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatchD", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkersEStr = (elemExists("Yonkers,SysTopPatchE", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatchE", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatchE", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     char *yonkersFStr = (elemExists("Yonkers,SysTopPatchF", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
-                         ? getPathOfElementInManifest("Yonkers,SysTopPatchF", manifeststr, getDeviceBoardNoCopy(),
-                                                      0) : nullptr);
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatchF", manifeststr, getDeviceBoardNoCopy(),
+                                                          0)
+                             : nullptr);
     std::array<std::string, 16> yonkersPaths{};
-
 
     char otaString[1024]{};
     if (yonkers0Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers0Str);
             yonkers0Str = reinterpret_cast<char *>(&otaString);
         }
         yonkersPaths[0] = futurerestoreTempPath + "/yonkers0.fw";
-            info("Downloading Yonkers,SysTopPatch0\n\n");
-            retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers0Str, yonkersPaths[0].c_str()),
-                      "Could not download Yonkers,SysTopPatch0\n");
+        info("Downloading Yonkers,SysTopPatch0\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers0Str, yonkersPaths[0].c_str()),
+                  "Could not download Yonkers,SysTopPatch0\n");
     }
     memset(otaString, 0, 1024);
     if (yonkers1Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers1Str);
             yonkers1Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2235,7 +2379,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers2Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers2Str);
             yonkers2Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2246,7 +2390,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers3Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers3Str);
             yonkers3Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2257,7 +2401,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers4Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers4Str);
             yonkers4Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2268,7 +2412,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers5Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers5Str);
             yonkers5Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2279,7 +2423,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers6Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers6Str);
             yonkers6Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2290,7 +2434,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers7Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers7Str);
             yonkers7Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2301,7 +2445,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers8Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers8Str);
             yonkers8Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2312,7 +2456,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkers9Str) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers9Str);
             yonkers9Str = reinterpret_cast<char *>(&otaString);
         }
@@ -2323,7 +2467,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkersAStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersAStr);
             yonkersAStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2334,7 +2478,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkersBStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersBStr);
             yonkersBStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2345,7 +2489,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkersCStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersCStr);
             yonkersCStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2356,7 +2500,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkersDStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersDStr);
             yonkersDStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2367,7 +2511,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkersEStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersEStr);
             yonkersEStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2378,7 +2522,7 @@ void futurerestore::downloadLatestYonkers() {
     }
     memset(otaString, 0, 1024);
     if (yonkersFStr) {
-        if(_useCustomLatestOTA) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersFStr);
             yonkersFStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2388,22 +2532,22 @@ void futurerestore::downloadLatestYonkers() {
                   "Could not download Yonkers,SysTopPatchF\n");
     }
     if (yonkers0Str &&
-            yonkers0Str &&
-            yonkers1Str &&
-            yonkers2Str &&
-            yonkers3Str &&
-            yonkers4Str &&
-            yonkers5Str &&
-            yonkers6Str &&
-            yonkers7Str &&
-            yonkers8Str &&
-            yonkers9Str &&
-            yonkersAStr &&
-            yonkersBStr &&
-            yonkersCStr &&
-            yonkersDStr &&
-            yonkersEStr &&
-            yonkersFStr) {
+        yonkers0Str &&
+        yonkers1Str &&
+        yonkers2Str &&
+        yonkers3Str &&
+        yonkers4Str &&
+        yonkers5Str &&
+        yonkers6Str &&
+        yonkers7Str &&
+        yonkers8Str &&
+        yonkers9Str &&
+        yonkersAStr &&
+        yonkersBStr &&
+        yonkersCStr &&
+        yonkersDStr &&
+        yonkersEStr &&
+        yonkersFStr) {
         loadYonkers(yonkersPaths);
     }
 }
@@ -2411,45 +2555,50 @@ void futurerestore::downloadLatestYonkers() {
 void futurerestore::downloadLatestCryptex1() {
     char *manifeststr = getLatestManifest();
     char *cryptex1SysOSStr = (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0)
-                              ? getPathOfElementInManifest(
-                    "Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                  ? getPathOfElementInManifest(
+                                        "Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                  : nullptr);
     auto *cryptex1SysOSDGSTStr = getDigestOfElementInManifest("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(),
                                                               _useCustomLatestOTA);
     info("Checking for cached Cryptex1...\n");
     auto *cryptex1SysOSHash = getSHA(cryptex1SysOSTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
 
     char *cryptex1SysVOLStr = (elemExists("Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), 0)
-                               ? getPathOfElementInManifest(
-                    "Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                   ? getPathOfElementInManifest(
+                                         "Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                   : nullptr);
     auto *cryptex1SysVOLDGSTStr = getDigestOfElementInManifest("Cryptex1,SystemVolume", manifeststr,
                                                                getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *cryptex1SysVOLHash = getSHA(cryptex1SysVOLTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
 
     char *cryptex1SysTCStr = (elemExists("Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), 0)
-                              ? getPathOfElementInManifest(
-                    "Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                  ? getPathOfElementInManifest(
+                                        "Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                  : nullptr);
     auto *cryptex1SysTCDGSTStr = getDigestOfElementInManifest("Cryptex1,SystemTrustCache", manifeststr,
                                                               getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *cryptex1SysTCHash = getSHA(cryptex1SysTCTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
 
     char *cryptex1AppOSStr = (elemExists("Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), 0)
-                              ? getPathOfElementInManifest(
-                    "Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                  ? getPathOfElementInManifest(
+                                        "Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                  : nullptr);
     auto *cryptex1AppOSDGSTStr = getDigestOfElementInManifest("Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(),
                                                               _useCustomLatestOTA);
     auto *cryptex1AppOSHash = getSHA(cryptex1AppOSTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
 
     char *cryptex1AppVOLStr = (elemExists("Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), 0)
-                               ? getPathOfElementInManifest(
-                    "Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                   ? getPathOfElementInManifest(
+                                         "Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                   : nullptr);
     auto *cryptex1AppVOLDGSTStr = getDigestOfElementInManifest("Cryptex1,AppVolume", manifeststr,
                                                                getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *cryptex1AppVOLHash = getSHA(cryptex1AppVOLTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
 
-
     char *cryptex1AppTCStr = (elemExists("Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), 0)
-                              ? getPathOfElementInManifest(
-                    "Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+                                  ? getPathOfElementInManifest(
+                                        "Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                                  : nullptr);
     auto *cryptex1AppTCDGSTStr = getDigestOfElementInManifest("Cryptex1,AppTrustCache", manifeststr,
                                                               getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *cryptex1AppTCHash = getSHA(cryptex1AppTCTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
@@ -2535,7 +2684,7 @@ void futurerestore::downloadLatestCryptex1() {
                       "Could not download Cryptex1,AppVolume\n");
         }
     }
-    if(cryptex1AppTCHash && cryptex1AppTCDGSTStr && !memcmp(cryptex1AppTCDGSTStr, cryptex1AppTCHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+    if (cryptex1AppTCHash && cryptex1AppTCDGSTStr && !memcmp(cryptex1AppTCDGSTStr, cryptex1AppTCHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
         info("Using cached Cryptex1,AppTrustCache.\n");
         safeFree(cryptex1AppTCDGSTStr);
         safeFree(cryptex1AppTCHash);
@@ -2554,32 +2703,33 @@ void futurerestore::downloadLatestCryptex1() {
 }
 
 void futurerestore::downloadLatestFirmwareComponents() {
-    info("Downloading the latest firmware components...\n");
-    char *manifeststr = getLatestManifest();
-    if (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestRose();
-    if (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestSE();
-    if (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)) {
-        downloadLatestSavage();
-    }
-    if (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) ||
-        elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestVeridian();
-    if (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestTimer();
-    if (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestBaobab();
-    if (elemExists("Yonkers,PatchEpoch", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestYonkers();
-    if (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestCryptex1();
-    info("Finished downloading the latest firmware components!\n");
+    info("Downloading the latest firmware components...?\n");
+    // char *manifeststr = getLatestManifest();
+    // if (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestRose();
+    // if (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestSE();
+    // if (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)) {
+    //     downloadLatestSavage();
+    // }
+    // if (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) ||
+    //     elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestVeridian();
+    // if (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestTimer();
+    // if (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestBaobab();
+    // if (elemExists("Yonkers,PatchEpoch", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestYonkers();
+    // const char *disableLatest = std::getenv("IDR_DISABLE_LATEST_CRYPTEX");
+    // if(!disableLatest && elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestCryptex1();
+    // info("Finished downloading the latest firmware components!\n");
 }
 
 void futurerestore::downloadLatestBaseband() {
@@ -2591,11 +2741,11 @@ void futurerestore::downloadLatestBaseband() {
     char *basebandData = nullptr;
     basebandData = readBaseband(basebandTempPath, basebandData, &basebandSize);
     bool cached = false;
-    if(bbcfgDigestString != nullptr && basebandData != nullptr) {
+    if (bbcfgDigestString != nullptr && basebandData != nullptr) {
         const char *bbcfgData = extractZipFileToString(basebandData, "bbcfg.mbn", (uint32_t *)&basebandSize);
-        if(bbcfgData != nullptr) {
-            auto *hash = getSHABuffer((char *) bbcfgData, basebandSize, 1);
-            if(hash && bbcfgDigestString && !memcmp(bbcfgDigestString, hash, 32)) {
+        if (bbcfgData != nullptr) {
+            auto *hash = getSHABuffer((char *)bbcfgData, basebandSize, 1);
+            if (hash && bbcfgDigestString && !memcmp(bbcfgDigestString, hash, 32)) {
                 info("Using cached Baseband.\n");
                 safeFree(bbcfgDigestString);
                 safeFree(hash);
@@ -2604,8 +2754,8 @@ void futurerestore::downloadLatestBaseband() {
         }
     }
     char otaString[1024]{};
-    if(!cached && pathStr) {
-        if(_useCustomLatestOTA) {
+    if (!cached && pathStr) {
+        if (_useCustomLatestOTA) {
             snprintf(otaString, 1024, "%s%s", "AssetData/boot/", pathStr);
             pathStr = reinterpret_cast<char *>(&otaString);
         }
@@ -2623,16 +2773,16 @@ void futurerestore::downloadLatestSep() {
     auto manifestString = std::string(getLatestManifest());
     saveStringToFile(manifestString, sepManifestTempPath);
     auto pathString = getPathOfElementInManifest("SEP", manifestString.c_str(), getDeviceBoardNoCopy(), _useCustomLatestOTA);
-    auto *digestString = getDigestOfElementInManifest("SEP",manifestString.c_str(), getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *digestString = getDigestOfElementInManifest("SEP", manifestString.c_str(), getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *hash = getSHA(sepTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
-    if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+    if (hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
         info("Using cached SEP.\n");
         safeFree(digestString);
         safeFree(hash);
     } else {
         char otaString[1024]{};
-        if(pathString) {
-            if(_useCustomLatestOTA) {
+        if (pathString) {
+            if (_useCustomLatestOTA) {
                 snprintf(otaString, 1024, "%s%s", "AssetData/boot/", pathString);
                 pathString = reinterpret_cast<char *>(&otaString);
             }
@@ -2646,68 +2796,68 @@ void futurerestore::downloadLatestSep() {
     loadSepManifest(this->_sepManifestPath);
 }
 
-void futurerestore::loadSepManifest(const std::string& sepManifestPath) {
+void futurerestore::loadSepManifest(const std::string &sepManifestPath) {
     this->_sepManifestPath = sepManifestPath;
     retassure(_sepbuildmanifest = loadPlistFromFile(sepManifestPath.c_str()),
               "Failed to load SEP Manifest");
 }
 
-void futurerestore::loadBasebandManifest(const std::string& basebandManifestPath) {
+void futurerestore::loadBasebandManifest(const std::string &basebandManifestPath) {
     this->_basebandManifestPath = basebandManifestPath;
     retassure(_basebandbuildmanifest = loadPlistFromFile(basebandManifestPath.c_str()),
               "Failed to load Baseband Manifest");
 };
 
-void futurerestore::loadRose(const std::string& rosePath) const {
+void futurerestore::loadRose(const std::string &rosePath) const {
     std::ifstream roseFileStream(rosePath, std::ios::in | std::ios::binary);
     retassure(roseFileStream.good(), "%s: failed init file stream for %s!\n", __func__, rosePath.c_str());
     _client->rosefwdatasize = futurerestore::getFileSize(rosePath);
     std::allocator<uint8_t> alloc;
     retassure(_client->rosefwdata = (char *)alloc.allocate(_client->rosefwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, rosePath.c_str());
-    roseFileStream.read((char *) _client->rosefwdata,
-                          (std::streamsize) _client->rosefwdatasize);
+    roseFileStream.read((char *)_client->rosefwdata,
+                        (std::streamsize)_client->rosefwdatasize);
     retassure(roseFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, rosePath.c_str());
-    retassure(*(uint64_t *) (_client->rosefwdata) != 0,
+    retassure(*(uint64_t *)(_client->rosefwdata) != 0,
               "%s: failed to load Rose for %s with the size %zu!\n",
               __func__, rosePath.c_str(), _client->rosefwdatasize);
 }
 
-void futurerestore::loadSE(const std::string& sePath) const {
+void futurerestore::loadSE(const std::string &sePath) const {
     std::ifstream seFileStream(sePath, std::ios::in | std::ios::binary);
     retassure(seFileStream.good(), "%s: failed init file stream for %s!\n", __func__, sePath.c_str());
     _client->sefwdatasize = futurerestore::getFileSize(sePath);
     std::allocator<uint8_t> alloc;
     retassure(_client->sefwdata = (char *)alloc.allocate(_client->sefwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, sePath.c_str());
-    seFileStream.read((char *) _client->sefwdata,
-                        (std::streamsize) _client->sefwdatasize);
+    seFileStream.read((char *)_client->sefwdata,
+                      (std::streamsize)_client->sefwdatasize);
     retassure(seFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, sePath.c_str());
-    retassure(*(uint64_t *) (_client->sefwdata) != 0,
+    retassure(*(uint64_t *)(_client->sefwdata) != 0,
               "%s: failed to load SE for %s with the size %zu!\n",
               __func__, sePath.c_str(), _client->sefwdatasize);
 }
 
-void futurerestore::loadSavage(const std::array<std::string, 6>& savagePaths) const {
+void futurerestore::loadSavage(const std::array<std::string, 6> &savagePaths) const {
     int index = 0;
-    for (const auto &savagePath: savagePaths) {
+    for (const auto &savagePath : savagePaths) {
         std::ifstream savageFileStream(savagePath, std::ios::in | std::ios::binary);
         retassure(savageFileStream.good(), "%s: failed init file stream for %s!\n", __func__, savagePath.c_str());
         _client->savagefwdatasize[index] = futurerestore::getFileSize(savagePath);
         std::allocator<uint8_t> alloc;
         retassure(_client->savagefwdata[index] = (char *)alloc.allocate(_client->savagefwdatasize[index]),
                   "%s: failed to allocate memory for %s\n", __func__, savagePath.c_str());
-        savageFileStream.read((char *) _client->savagefwdata[index],
-                              (std::streamsize) _client->savagefwdatasize[index]);
+        savageFileStream.read((char *)_client->savagefwdata[index],
+                              (std::streamsize)_client->savagefwdatasize[index]);
         retassure(savageFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, savagePath.c_str());
-        retassure(*(uint64_t *) (_client->savagefwdata[index]) != 0,
+        retassure(*(uint64_t *)(_client->savagefwdata[index]) != 0,
                   "%s: failed to load Savage for %s with the size %zu!\n",
                   __func__, savagePath.c_str(), _client->savagefwdatasize[index]);
         index++;
     }
 }
 
-void futurerestore::loadVeridian(const std::string& veridianDGMPath, const std::string& veridianFWMPath) const {
+void futurerestore::loadVeridian(const std::string &veridianDGMPath, const std::string &veridianFWMPath) const {
     std::ifstream veridianDGMFileStream(veridianDGMPath, std::ios::in | std::ios::binary);
     std::ifstream veridianFWMFileStream(veridianFWMPath, std::ios::in | std::ios::binary);
     retassure(veridianDGMFileStream.good(), "%s: failed init file stream for %s!\n", __func__, veridianDGMPath.c_str());
@@ -2717,25 +2867,25 @@ void futurerestore::loadVeridian(const std::string& veridianDGMPath, const std::
     std::allocator<uint8_t> alloc;
     retassure(_client->veridiandgmfwdata = (char *)alloc.allocate(_client->veridiandgmfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, veridianDGMPath.c_str());
-    veridianDGMFileStream.read((char *) _client->veridiandgmfwdata,
-                               (std::streamsize) _client->veridiandgmfwdatasize);
+    veridianDGMFileStream.read((char *)_client->veridiandgmfwdata,
+                               (std::streamsize)_client->veridiandgmfwdatasize);
     retassure(veridianDGMFileStream.good(), "%s: failed init read stream for %s!\n", __func__, veridianDGMPath.c_str());
-    retassure(*(uint64_t *) (_client->veridiandgmfwdata) != 0,
+    retassure(*(uint64_t *)(_client->veridiandgmfwdata) != 0,
               "%s: failed to load Veridian for %s with the size %zu!\n",
               __func__, veridianDGMPath.c_str(), _client->veridiandgmfwdatasize);
     _client->veridianfwmfwdatasize = futurerestore::getFileSize(veridianFWMPath);
     retassure(_client->veridianfwmfwdata = (char *)alloc.allocate(_client->veridianfwmfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, veridianFWMPath.c_str());
-    veridianFWMFileStream.read((char *) _client->veridianfwmfwdata,
-                               (std::streamsize) _client->veridianfwmfwdatasize);
+    veridianFWMFileStream.read((char *)_client->veridianfwmfwdata,
+                               (std::streamsize)_client->veridianfwmfwdatasize);
     retassure(veridianFWMFileStream.good(), "%s: failed to read file stream for %s!\n", __func__,
               veridianFWMPath.c_str());
-    retassure(*(uint64_t *) (_client->veridianfwmfwdata) != 0,
+    retassure(*(uint64_t *)(_client->veridianfwmfwdata) != 0,
               "%s: failed to load Veridian for %s with the size %zu!\n",
               __func__, veridianFWMPath.c_str(), _client->veridianfwmfwdatasize);
 }
 
-void futurerestore::loadTimer(const std::string& timerPath) const {
+void futurerestore::loadTimer(const std::string &timerPath) const {
     std::ifstream timerFileStream(timerPath, std::ios::in | std::ios::binary);
     retassure(timerFileStream.good(), "%s: failed init file stream for %s!\n", __func__, timerPath.c_str());
     _client->timerfwdatasize = futurerestore::getFileSize(timerPath);
@@ -2745,36 +2895,36 @@ void futurerestore::loadTimer(const std::string& timerPath) const {
               "%s: failed to allocate memory for %s\n", __func__, timerPath.c_str());
     retassure(_client->rtimerfwdata = (char *)alloc.allocate(_client->rtimerfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, timerPath.c_str());
-    timerFileStream.read((char *) _client->timerfwdata,
-                      (std::streamsize) _client->timerfwdatasize);
+    timerFileStream.read((char *)_client->timerfwdata,
+                         (std::streamsize)_client->timerfwdatasize);
     retassure(timerFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, timerPath.c_str());
-    retassure(*(uint64_t *) (_client->timerfwdata) != 0,
+    retassure(*(uint64_t *)(_client->timerfwdata) != 0,
               "%s: failed to load Timer for %s with the size %zu!\n",
               __func__, timerPath.c_str(), _client->timerfwdatasize);
-    timerFileStream.read((char *) _client->rtimerfwdata,
-                      (std::streamsize) _client->rtimerfwdatasize);
+    timerFileStream.read((char *)_client->rtimerfwdata,
+                         (std::streamsize)_client->rtimerfwdatasize);
     retassure(timerFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, timerPath.c_str());
-    retassure(*(uint64_t *) (_client->rtimerfwdata) != 0,
+    retassure(*(uint64_t *)(_client->rtimerfwdata) != 0,
               "%s: failed to load Timer for %s with the size %zu!\n",
               __func__, timerPath.c_str(), _client->rtimerfwdatasize);
 }
 
-void futurerestore::loadBaobab(const std::string& baobabPath) const {
+void futurerestore::loadBaobab(const std::string &baobabPath) const {
     std::ifstream baobobFileStream(baobabPath, std::ios::in | std::ios::binary);
     retassure(baobobFileStream.good(), "%s: failed init file stream for %s!\n", __func__, baobabPath.c_str());
     _client->baobabfwdatasize = futurerestore::getFileSize(baobabPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->baobabfwdata = (char *)alloc.allocate(_client->baobabfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, baobabPath.c_str());
-    baobobFileStream.read((char *) _client->baobabfwdata,
-                      (std::streamsize) _client->baobabfwdatasize);
+    baobobFileStream.read((char *)_client->baobabfwdata,
+                          (std::streamsize)_client->baobabfwdatasize);
     retassure(baobobFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, baobabPath.c_str());
-    retassure(*(uint64_t *) (_client->baobabfwdata) != 0,
+    retassure(*(uint64_t *)(_client->baobabfwdata) != 0,
               "%s: failed to load Baobab for %s with the size %zu!\n",
               __func__, baobabPath.c_str(), _client->baobabfwdatasize);
 }
 
-void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std::string& cryptex1SysVOLPath, const std::string& cryptex1SysTCPath, const std::string& cryptex1AppOSPath, const std::string& cryptex1AppVOLPath, const std::string& cryptex1AppTCPath) const {
+void futurerestore::loadCryptex1(const std::string &cryptex1SysOSPath, const std::string &cryptex1SysVOLPath, const std::string &cryptex1SysTCPath, const std::string &cryptex1AppOSPath, const std::string &cryptex1AppVOLPath, const std::string &cryptex1AppTCPath) const {
     std::ifstream cryptex1SysOSFileStream(cryptex1SysOSPath, std::ios::in | std::ios::binary);
     retassure(cryptex1SysOSFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysOSPath.c_str());
     _client->cryptex1sysosdatasize = futurerestore::getFileSize(cryptex1SysOSPath);
@@ -2782,10 +2932,10 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
 
     retassure(_client->cryptex1sysosdata = (char *)alloc.allocate(_client->cryptex1sysosdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1SysOSPath.c_str());
-    cryptex1SysOSFileStream.read((char *) _client->cryptex1sysosdata,
-                      (std::streamsize) _client->cryptex1sysosdatasize);
+    cryptex1SysOSFileStream.read((char *)_client->cryptex1sysosdata,
+                                 (std::streamsize)_client->cryptex1sysosdatasize);
     retassure(cryptex1SysOSFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1SysOSPath.c_str());
-    retassure(*(uint64_t *) (_client->cryptex1sysosdata) != 0,
+    retassure(*(uint64_t *)(_client->cryptex1sysosdata) != 0,
               "%s: failed to load Cryptex1,SystemOS for %s with the size %zu!\n",
               __func__, cryptex1SysOSPath.c_str(), _client->cryptex1sysosdatasize);
 
@@ -2794,10 +2944,10 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
     _client->cryptex1sysvoldatasize = futurerestore::getFileSize(cryptex1SysVOLPath);
     retassure(_client->cryptex1sysvoldata = (char *)alloc.allocate(_client->cryptex1sysvoldatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1SysVOLPath.c_str());
-    cryptex1SysVOLFileStream.read((char *) _client->cryptex1sysvoldata,
-                      (std::streamsize) _client->cryptex1sysvoldatasize);
+    cryptex1SysVOLFileStream.read((char *)_client->cryptex1sysvoldata,
+                                  (std::streamsize)_client->cryptex1sysvoldatasize);
     retassure(cryptex1SysVOLFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1SysVOLPath.c_str());
-    retassure(*(uint64_t *) (_client->cryptex1sysvoldata) != 0,
+    retassure(*(uint64_t *)(_client->cryptex1sysvoldata) != 0,
               "%s: failed to load Cryptex1,SystemVolume for %s with the size %zu!\n",
               __func__, cryptex1SysVOLPath.c_str(), _client->cryptex1sysvoldatasize);
 
@@ -2806,10 +2956,10 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
     _client->cryptex1systcdatasize = futurerestore::getFileSize(cryptex1SysTCPath);
     retassure(_client->cryptex1systcdata = (char *)alloc.allocate(_client->cryptex1systcdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1SysTCPath.c_str());
-    cryptex1SysTCFileStream.read((char *) _client->cryptex1systcdata,
-                                 (std::streamsize) _client->cryptex1systcdatasize);
+    cryptex1SysTCFileStream.read((char *)_client->cryptex1systcdata,
+                                 (std::streamsize)_client->cryptex1systcdatasize);
     retassure(cryptex1SysTCFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1SysTCPath.c_str());
-    retassure(*(uint64_t *) (_client->cryptex1systcdata) != 0,
+    retassure(*(uint64_t *)(_client->cryptex1systcdata) != 0,
               "%s: failed to load Cryptex1,SystemTrustCache for %s with the size %zu!\n",
               __func__, cryptex1SysTCPath.c_str(), _client->cryptex1systcdatasize);
 
@@ -2818,10 +2968,10 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
     _client->cryptex1apposdatasize = futurerestore::getFileSize(cryptex1AppOSPath);
     retassure(_client->cryptex1apposdata = (char *)alloc.allocate(_client->cryptex1apposdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1AppOSPath.c_str());
-    cryptex1AppOSFileStream.read((char *) _client->cryptex1apposdata,
-                                 (std::streamsize) _client->cryptex1apposdatasize);
+    cryptex1AppOSFileStream.read((char *)_client->cryptex1apposdata,
+                                 (std::streamsize)_client->cryptex1apposdatasize);
     retassure(cryptex1AppOSFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1AppOSPath.c_str());
-    retassure(*(uint64_t *) (_client->cryptex1apposdata) != 0,
+    retassure(*(uint64_t *)(_client->cryptex1apposdata) != 0,
               "%s: failed to load Cryptex1,AppOS for %s with the size %zu!\n",
               __func__, cryptex1AppOSPath.c_str(), _client->cryptex1apposdatasize);
 
@@ -2830,10 +2980,10 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
     _client->cryptex1appvoldatasize = futurerestore::getFileSize(cryptex1AppVOLPath);
     retassure(_client->cryptex1appvoldata = (char *)alloc.allocate(_client->cryptex1appvoldatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1AppVOLPath.c_str());
-    cryptex1AppVOLFileStream.read((char *) _client->cryptex1appvoldata,
-                                  (std::streamsize) _client->cryptex1appvoldatasize);
+    cryptex1AppVOLFileStream.read((char *)_client->cryptex1appvoldata,
+                                  (std::streamsize)_client->cryptex1appvoldatasize);
     retassure(cryptex1AppVOLFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1AppVOLPath.c_str());
-    retassure(*(uint64_t *) (_client->cryptex1appvoldata) != 0,
+    retassure(*(uint64_t *)(_client->cryptex1appvoldata) != 0,
               "%s: failed to load Cryptex1,AppVolume for %s with the size %zu!\n",
               __func__, cryptex1AppVOLPath.c_str(), _client->cryptex1appvoldatasize);
 
@@ -2842,79 +2992,79 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
     _client->cryptex1apptcdatasize = futurerestore::getFileSize(cryptex1AppTCPath);
     retassure(_client->cryptex1apptcdata = (char *)alloc.allocate(_client->cryptex1apptcdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1AppTCPath.c_str());
-    cryptex1AppTCFileStream.read((char *) _client->cryptex1apptcdata,
-                                 (std::streamsize) _client->cryptex1apptcdatasize);
+    cryptex1AppTCFileStream.read((char *)_client->cryptex1apptcdata,
+                                 (std::streamsize)_client->cryptex1apptcdatasize);
     retassure(cryptex1AppTCFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1AppTCPath.c_str());
-    retassure(*(uint64_t *) (_client->cryptex1apptcdata) != 0,
+    retassure(*(uint64_t *)(_client->cryptex1apptcdata) != 0,
               "%s: failed to load Cryptex1,AppTrustCache for %s with the size %zu!\n",
               __func__, cryptex1AppTCPath.c_str(), _client->cryptex1apptcdatasize);
 }
 
-void futurerestore::loadYonkers(const std::array<std::string, 16>& yonkersPaths) const {
+void futurerestore::loadYonkers(const std::array<std::string, 16> &yonkersPaths) const {
     int index = 0;
-    for (const auto &yonkersPath: yonkersPaths) {
+    for (const auto &yonkersPath : yonkersPaths) {
         std::ifstream yonkersFileStream(yonkersPath, std::ios::in | std::ios::binary);
         retassure(yonkersFileStream.good(), "%s: failed init file stream for %s!\n", __func__, yonkersPath.c_str());
         _client->yonkersfwdatasize[index] = futurerestore::getFileSize(yonkersPath);
         std::allocator<uint8_t> alloc;
         retassure(_client->yonkersfwdata[index] = (char *)alloc.allocate(_client->yonkersfwdatasize[index]),
                   "%s: failed to allocate memory for %s\n", __func__, yonkersPath.c_str());
-        yonkersFileStream.read((char *) _client->yonkersfwdata[index],
-        (std::streamsize) _client->yonkersfwdatasize[index]);
+        yonkersFileStream.read((char *)_client->yonkersfwdata[index],
+                               (std::streamsize)_client->yonkersfwdatasize[index]);
         retassure(yonkersFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, yonkersPath.c_str());
-        retassure(*(uint64_t *) (_client->yonkersfwdata[index]) != 0,
+        retassure(*(uint64_t *)(_client->yonkersfwdata[index]) != 0,
                   "%s: failed to load Yonkers for %s with the size %zu!\n",
                   __func__, yonkersPath.c_str(), _client->yonkersfwdatasize[index]);
         index++;
     }
 }
 
-void futurerestore::loadRamdisk(const std::string& ramdiskPath) const {
+void futurerestore::loadRamdisk(const std::string &ramdiskPath) const {
     std::ifstream ramdiskFileStream(ramdiskPath, std::ios::in | std::ios::binary);
     retassure(ramdiskFileStream.good(), "%s: failed init file stream for %s!\n", __func__, ramdiskPath.c_str());
     _client->ramdiskdatasize = futurerestore::getFileSize(ramdiskPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->ramdiskdata = (char *)alloc.allocate(_client->ramdiskdatasize),
               "%s: failed to allocate memory for %s\n", __func__, ramdiskPath.c_str());
-    ramdiskFileStream.read((char *) _client->ramdiskdata,
-                           (std::streamsize) _client->ramdiskdatasize);
+    ramdiskFileStream.read((char *)_client->ramdiskdata,
+                           (std::streamsize)_client->ramdiskdatasize);
     retassure(ramdiskFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, ramdiskPath.c_str());
-    retassure(*(uint64_t *) (_client->ramdiskdata) != 0,
+    retassure(*(uint64_t *)(_client->ramdiskdata) != 0,
               "%s: failed to load Ramdisk for %s with the size %zu!\n",
               __func__, ramdiskPath.c_str(), _client->ramdiskdatasize);
 }
 
-void futurerestore::loadKernel(const std::string& kernelPath) const {
+void futurerestore::loadKernel(const std::string &kernelPath) const {
     std::ifstream kernelFileStream(kernelPath, std::ios::in | std::ios::binary);
     retassure(kernelFileStream.good(), "%s: failed init file stream for %s!\n", __func__, kernelPath.c_str());
     _client->kerneldatasize = futurerestore::getFileSize(kernelPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->kerneldata = (char *)alloc.allocate(_client->kerneldatasize),
               "%s: failed to allocate memory for %s\n", __func__, kernelPath.c_str());
-    kernelFileStream.read((char *) _client->kerneldata,
-                          (std::streamsize) _client->kerneldatasize);
+    kernelFileStream.read((char *)_client->kerneldata,
+                          (std::streamsize)_client->kerneldatasize);
     retassure(kernelFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, kernelPath.c_str());
-    retassure(*(uint64_t *) (_client->kerneldata) != 0,
+    retassure(*(uint64_t *)(_client->kerneldata) != 0,
               "%s: failed to load Kernel for %s with the size %zu!\n",
               __func__, kernelPath.c_str(), _client->kerneldatasize);
 }
 
-void futurerestore::loadSep(const std::string& sepPath) const {
+void futurerestore::loadSep(const std::string &sepPath) const {
     std::ifstream sepFileStream(sepPath, std::ios::binary | std::ios::in);
     retassure(sepFileStream.good(), "%s: failed init file stream for %s!\n", __func__, sepPath.c_str());
     _client->sepfwdatasize = futurerestore::getFileSize(sepPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->sepfwdata = (char *)alloc.allocate(_client->sepfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, sepPath.c_str());
-    sepFileStream.read(reinterpret_cast<char*>(_client->sepfwdata),
-                          static_cast<std::streamsize>(_client->sepfwdatasize));
+    sepFileStream.read(reinterpret_cast<char *>(_client->sepfwdata),
+                       static_cast<std::streamsize>(_client->sepfwdatasize));
     retassure(sepFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, sepPath.c_str());
-    retassure(*(uint64_t *) (_client->sepfwdata) != 0,
+    retassure(*(uint64_t *)(_client->sepfwdata) != 0,
               "%s: failed to load SEP for %s with the size %zu!\n",
               __func__, sepPath.c_str(), _client->sepfwdatasize);
 }
 
-void futurerestore::loadBaseband(const std::string& basebandPath) {
+void futurerestore::loadBaseband(const std::string &basebandPath) {
     std::ifstream basebandFileStream(basebandPath, std::ios::binary | std::ios::in);
     retassure(basebandFileStream.good(), "%s: failed init file stream for %s!\n", __func__, basebandPath.c_str());
     uint64_t *basebandFront = nullptr;
@@ -2923,24 +3073,24 @@ void futurerestore::loadBaseband(const std::string& basebandPath) {
               "%s: failed to allocate memory for %s\n", __func__, basebandPath.c_str());
     basebandFileStream.read((char *)basebandFront, (std::streamsize)sizeof(uint64_t));
     retassure(basebandFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, basebandPath.c_str());
-    retassure(*(uint64_t *) (basebandFront) != 0, "%s: failed to load Baseband for %s!\n",
+    retassure(*(uint64_t *)(basebandFront) != 0, "%s: failed to load Baseband for %s!\n",
               __func__, basebandPath.c_str());
 }
 
-char *futurerestore::readBaseband(const std::string& basebandPath, char *data, size_t *sz) {
+char *futurerestore::readBaseband(const std::string &basebandPath, char *data, size_t *sz) {
     std::ifstream basebandFileStream(basebandPath, std::ios::binary | std::ios::in);
-    if(!basebandFileStream.good()) {
+    if (!basebandFileStream.good()) {
         return nullptr;
     }
     size_t basebandSize = futurerestore::getFileSize(basebandPath);
     uint64_t *basebandData = nullptr;
     std::allocator<uint8_t> alloc;
     basebandData = (uint64_t *)alloc.allocate(basebandSize);
-    if(!basebandData) {
+    if (!basebandData) {
         return nullptr;
     }
     basebandFileStream.read((char *)basebandData, (std::streamsize)basebandSize);
-    if(!basebandFileStream.good()) {
+    if (!basebandFileStream.good()) {
         return nullptr;
     }
     *sz = basebandSize;
@@ -2950,115 +3100,115 @@ char *futurerestore::readBaseband(const std::string& basebandPath, char *data, s
 unsigned char *futurerestore::getSHABuffer(char *data, size_t dataSize, int type) {
     std::allocator<uint8_t> alloc;
     auto *fileHash = (unsigned char *)nullptr;
-    switch(type) {
+    switch (type) {
         case 0:
-            fileHash = (unsigned char *) alloc.allocate(48);
+            fileHash = (unsigned char *)alloc.allocate(48);
             memset(fileHash, 0, 48);
-            SHA384((const unsigned char*)data, (unsigned int)dataSize, fileHash);
+            SHA384((const unsigned char *)data, (unsigned int)dataSize, fileHash);
             break;
         case 1:
-            fileHash = (unsigned char *) alloc.allocate(32);
+            fileHash = (unsigned char *)alloc.allocate(32);
             memset(fileHash, 0, 32);
-            SHA256((const unsigned char*)data, (unsigned int)dataSize, fileHash);
+            SHA256((const unsigned char *)data, (unsigned int)dataSize, fileHash);
             break;
         case 2:
-            fileHash = (unsigned char *) alloc.allocate(64);
+            fileHash = (unsigned char *)alloc.allocate(64);
             memset(fileHash, 0, 64);
-            SHA512((const unsigned char*)data, (unsigned int)dataSize, fileHash);
+            SHA512((const unsigned char *)data, (unsigned int)dataSize, fileHash);
             break;
         case 3:
-            fileHash = (unsigned char *) alloc.allocate(20);
+            fileHash = (unsigned char *)alloc.allocate(20);
             memset(fileHash, 0, 20);
-            SHA1((const unsigned char*)data, (unsigned int)dataSize, fileHash);
+            SHA1((const unsigned char *)data, (unsigned int)dataSize, fileHash);
             break;
         default:
-            fileHash = (unsigned char *) alloc.allocate(48);
+            fileHash = (unsigned char *)alloc.allocate(48);
             memset(fileHash, 0, 48);
-            SHA384((const unsigned char*)data, (unsigned int)dataSize, fileHash);
+            SHA384((const unsigned char *)data, (unsigned int)dataSize, fileHash);
             break;
     }
     return fileHash;
 }
 
 unsigned char *futurerestore::getSHABufferStream(std::ifstream &stream, int type) {
-  std::allocator<uint8_t> alloc;
-  auto *fileHash = (unsigned char *)nullptr;
-  const size_t bufferSize = 0x100000;
-  char *buffer = (char *)alloc.allocate(bufferSize);
-  switch(type) {
-  case 1:
-    fileHash = (unsigned char *) alloc.allocate(32);
-    memset(fileHash, 0, 32);
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
+    std::allocator<uint8_t> alloc;
+    auto *fileHash = (unsigned char *)nullptr;
+    const size_t bufferSize = 0x100000;
+    char *buffer = (char *)alloc.allocate(bufferSize);
+    switch (type) {
+        case 1:
+            fileHash = (unsigned char *)alloc.allocate(32);
+            memset(fileHash, 0, 32);
+            SHA256_CTX sha256;
+            SHA256_Init(&sha256);
 
-    while(stream.good()) {
-      stream.read(buffer, bufferSize);
-      std::streamsize bytesRead = stream.gcount();
-      if (bytesRead > 0) {
-        SHA256_Update(&sha256, buffer, bytesRead);
-      }
-    }
-    SHA256_Final(fileHash, &sha256);
-    break;
-  case 2:
-    fileHash = (unsigned char *) alloc.allocate(64);
-    memset(fileHash, 0, 64);
-    SHA512_CTX sha512;
-    SHA512_Init(&sha512);
+            while (stream.good()) {
+                stream.read(buffer, bufferSize);
+                std::streamsize bytesRead = stream.gcount();
+                if (bytesRead > 0) {
+                    SHA256_Update(&sha256, buffer, bytesRead);
+                }
+            }
+            SHA256_Final(fileHash, &sha256);
+            break;
+        case 2:
+            fileHash = (unsigned char *)alloc.allocate(64);
+            memset(fileHash, 0, 64);
+            SHA512_CTX sha512;
+            SHA512_Init(&sha512);
 
-    while(stream.good()) {
-      stream.read(buffer, bufferSize);
-      std::streamsize bytesRead = stream.gcount();
-      if (bytesRead > 0) {
-        SHA512_Update(&sha512, buffer, bytesRead);
-      }
-    }
-    SHA512_Final(fileHash, &sha512);
-    break;
-  case 3:
-    fileHash = (unsigned char *) alloc.allocate(20);
-    memset(fileHash, 0, 20);
-    SHA_CTX sha1;
-    SHA1_Init(&sha1);
+            while (stream.good()) {
+                stream.read(buffer, bufferSize);
+                std::streamsize bytesRead = stream.gcount();
+                if (bytesRead > 0) {
+                    SHA512_Update(&sha512, buffer, bytesRead);
+                }
+            }
+            SHA512_Final(fileHash, &sha512);
+            break;
+        case 3:
+            fileHash = (unsigned char *)alloc.allocate(20);
+            memset(fileHash, 0, 20);
+            SHA_CTX sha1;
+            SHA1_Init(&sha1);
 
-    while(stream.good()) {
-      stream.read(buffer, bufferSize);
-      std::streamsize bytesRead = stream.gcount();
-      if (bytesRead > 0) {
-        SHA1_Update(&sha1, buffer, bytesRead);
-      }
-    }
-    SHA1_Final(fileHash, &sha1);
-    break;
-  default:
-    fileHash = (unsigned char *) alloc.allocate(48);
-    memset(fileHash, 0, 48);
-    SHA512_CTX sha384;
-    SHA384_Init(&sha384);
+            while (stream.good()) {
+                stream.read(buffer, bufferSize);
+                std::streamsize bytesRead = stream.gcount();
+                if (bytesRead > 0) {
+                    SHA1_Update(&sha1, buffer, bytesRead);
+                }
+            }
+            SHA1_Final(fileHash, &sha1);
+            break;
+        default:
+            fileHash = (unsigned char *)alloc.allocate(48);
+            memset(fileHash, 0, 48);
+            SHA512_CTX sha384;
+            SHA384_Init(&sha384);
 
-    while(stream.good()) {
-      stream.read(buffer, bufferSize);
-      std::streamsize bytesRead = stream.gcount();
-      if (bytesRead > 0) {
-        SHA384_Update(&sha384, buffer, bytesRead);
-      }
+            while (stream.good()) {
+                stream.read(buffer, bufferSize);
+                std::streamsize bytesRead = stream.gcount();
+                if (bytesRead > 0) {
+                    SHA384_Update(&sha384, buffer, bytesRead);
+                }
+            }
+            SHA384_Final(fileHash, &sha384);
+            break;
     }
-    SHA384_Final(fileHash, &sha384);
-    break;
-  }
-  free(buffer);
-  stream.seekg(0, std::ios::beg);
-  return fileHash;
+    free(buffer);
+    stream.seekg(0, std::ios::beg);
+    return fileHash;
 }
 
 size_t futurerestore::getFileSize(const std::string &name) {
 #ifdef WIN32
     struct _stat64 st{0};
-    if(_stat64(name.c_str(), &st) < 0) {
+    if (_stat64(name.c_str(), &st) < 0) {
 #else
     struct stat st{0};
-    if(stat(name.c_str(), &st) < 0) {
+    if (stat(name.c_str(), &st) < 0) {
 #endif
         error("%s: failed to get file size for %s\n", __func__, name.c_str());
         return 0;
@@ -3066,38 +3216,38 @@ size_t futurerestore::getFileSize(const std::string &name) {
     return st.st_size;
 }
 
-unsigned char *futurerestore::getSHA(const std::string& filePath, int type) {
+unsigned char *futurerestore::getSHA(const std::string &filePath, int type) {
     std::ifstream fileStream(filePath, std::ios::binary | std::ios::in);
-    if(!fileStream.good()) {
+    if (!fileStream.good()) {
         info("Cached %s not found, downloading a new one.\n", filePath.c_str());
         return nullptr;
     }
     size_t dataSize = futurerestore::getFileSize(filePath);
-    if(!dataSize) {
+    if (!dataSize) {
         error("%s: failed to get file size for %s\n", __func__, filePath.c_str());
         return nullptr;
     }
     std::allocator<uint8_t> alloc;
     char *data = nullptr;
     try {
-      data = (char *) alloc.allocate(8);
-    } catch(std::bad_alloc const&) {
-        if(!data) {
+        data = (char *)alloc.allocate(8);
+    } catch (std::bad_alloc const &) {
+        if (!data) {
             error("%s: failed to allocate memory for %s\n", __func__, filePath.c_str());
             throw;
         }
     }
-    if(!data) {
-      error("%s: failed to allocate memory for %s\n", __func__, filePath.c_str());
-      return nullptr;
+    if (!data) {
+        error("%s: failed to allocate memory for %s\n", __func__, filePath.c_str());
+        return nullptr;
     }
-    fileStream.read((char *) data,
-                       (std::streamsize) 8);
-    if(!fileStream.good()) {
+    fileStream.read((char *)data,
+                    (std::streamsize)8);
+    if (!fileStream.good()) {
         info("Failed to read cached file %s, downloading a new one.\n", filePath.c_str());
         return nullptr;
     }
-    if(*(uint64_t *)(data) == 0) {
+    if (*(uint64_t *)(data) == 0) {
         error("%s: failed to load File for %s with the size %zu!\n",
               __func__, filePath.c_str(), dataSize);
         return nullptr;
@@ -3109,7 +3259,7 @@ unsigned char *futurerestore::getSHA(const std::string& filePath, int type) {
 #pragma mark static methods
 
 inline void futurerestore::saveStringToFile(std::string &str, std::string &path) {
-    if(str.empty() || path.empty()) {
+    if (str.empty() || path.empty()) {
         info("%s: No data to save!\n", __func__);
         return;
     }
@@ -3132,9 +3282,9 @@ std::pair<const char *, size_t> futurerestore::getNonceFromSCAB(const char *scab
 
     img4tool::ASN1DERElement mainSet = bacs[1];
 
-    for (auto &elem: mainSet) {
-        if (*(uint8_t *) elem.buf() == 0x92) {
-            return {(char *) elem.payload(), elem.payloadSize()};
+    for (auto &elem : mainSet) {
+        if (*(uint8_t *)elem.buf() == 0x92) {
+            return {(char *)elem.payload(), elem.payloadSize()};
         }
     }
     reterror("failed to get nonce from SCAB");
@@ -3154,12 +3304,12 @@ uint64_t futurerestore::getEcidFromSCAB(const char *scab, size_t scabSize) {
 
     img4tool::ASN1DERElement mainSet = bacs[1];
 
-    for (auto &elem: mainSet) {
-        if (*(uint8_t *) elem.buf() == 0x81) {
+    for (auto &elem : mainSet) {
+        if (*(uint8_t *)elem.buf() == 0x81) {
             uint64_t ret = 0;
             for (int i = 0; i < elem.payloadSize(); i++) {
                 ret <<= 8;
-                ret |= ((uint8_t *) elem.payload())[i];
+                ret |= ((uint8_t *)elem.payload())[i];
             }
             return __bswap_64(ret);
         }
@@ -3182,9 +3332,9 @@ std::pair<const char *, size_t> futurerestore::getRamdiskHashFromSCAB(const char
 
     img4tool::ASN1DERElement mainSet = bacs[1];
 
-    for (auto &elem: mainSet) {
-        if (*(uint8_t *) elem.buf() == 0x9A) {
-            return {(char *) elem.payload(), elem.payloadSize()};
+    for (auto &elem : mainSet) {
+        if (*(uint8_t *)elem.buf() == 0x9A) {
+            return {(char *)elem.payload(), elem.payloadSize()};
         }
     }
     reterror("failed to get nonce from SCAB");
@@ -3203,7 +3353,7 @@ plist_t futurerestore::loadPlistFromFile(const char *path) {
     size_t bufSize = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *buf = (char *) malloc(bufSize);
+    char *buf = (char *)malloc(bufSize);
     if (!buf) {
         error("failed to alloc memory\n");
         return nullptr;
@@ -3217,9 +3367,9 @@ plist_t futurerestore::loadPlistFromFile(const char *path) {
     fclose(f);
 
     if (memcmp(buf, "bplist00", 8) == 0)
-        plist_from_bin(buf, (uint32_t) bufSize, &ret);
+        plist_from_bin(buf, (uint32_t)bufSize, &ret);
     else
-        plist_from_xml(buf, (uint32_t) bufSize, &ret);
+        plist_from_xml(buf, (uint32_t)bufSize, &ret);
     free(buf);
 
     return ret;
@@ -3230,7 +3380,7 @@ char *futurerestore::getPathOfElementInManifest(const char *element, const char 
     char *pathStr = nullptr;
     ptr_smart<plist_t> buildmanifest(NULL, plist_free);
 
-    plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &buildmanifest);
+    plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
 
     if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall))
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest"))
@@ -3241,17 +3391,17 @@ char *futurerestore::getPathOfElementInManifest(const char *element, const char 
                             goto noerror;
 
     reterror("Could not get %s path\n", element);
-    noerror:
+noerror:
     return pathStr;
 }
 
 unsigned char *futurerestore::getDigestOfElementInManifest(const char *element, const char *manifeststr, const char *boardConfig,
-                                                int isUpdateInstall) {
+                                                           int isUpdateInstall) {
     char *digestStr = nullptr;
     ptr_smart<plist_t> buildmanifest(NULL, plist_free);
     uint64_t size;
 
-    plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &buildmanifest);
+    plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
 
     if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall)) {
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest")) {
@@ -3266,17 +3416,17 @@ unsigned char *futurerestore::getDigestOfElementInManifest(const char *element, 
     }
 
     return nullptr;
-    noerror:
+noerror:
     return (unsigned char *)digestStr;
 }
 
 unsigned char *futurerestore::getBBCFGDigestInManifest(const char *manifeststr, const char *boardConfig,
-                                                int isUpdateInstall) {
+                                                       int isUpdateInstall) {
     char *digestStr = nullptr;
     ptr_smart<plist_t> buildmanifest(NULL, plist_free);
     uint64_t size;
 
-    plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &buildmanifest);
+    plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
 
     if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall)) {
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest")) {
@@ -3291,16 +3441,15 @@ unsigned char *futurerestore::getBBCFGDigestInManifest(const char *manifeststr, 
     }
 
     return nullptr;
-    noerror:
+noerror:
     return (unsigned char *)digestStr;
 }
 
-bool
-futurerestore::elemExists(const char *element, const char *manifeststr, const char *boardConfig, int isUpdateInstall) {
+bool futurerestore::elemExists(const char *element, const char *manifeststr, const char *boardConfig, int isUpdateInstall) {
     char *pathStr = nullptr;
     ptr_smart<plist_t> buildmanifest(NULL, plist_free);
 
-    plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &buildmanifest);
+    plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
 
     if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall))
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest"))
@@ -3311,7 +3460,7 @@ futurerestore::elemExists(const char *element, const char *manifeststr, const ch
                             goto noerror;
 
     return false;
-    noerror:
+noerror:
     return true;
 }
 
@@ -3330,7 +3479,6 @@ std::string futurerestore::getGeneratorFromSHSH2(plist_t shsh2) {
     plist_get_string_val(pGenerator, &genstr);
     assure(genstr);
 
-
     gen = std::stoull(genstr, nullptr, 16);
     retassure(gen, "failed to parse generator. Make sure it is in format 0x%16llx");
 
@@ -3347,12 +3495,12 @@ void futurerestore::checkForUpdates() {
     char *buffer = nullptr;
     uint32_t sz = 0;
     uint32_t sz2 = 0;
-    if(download_to_buffer(url.c_str(), &buffer, &sz)) {
+    if (download_to_buffer(url.c_str(), &buffer, &sz)) {
         fail = true;
     } else {
         sz2 = sz;
         const char *tmp = extractZipFileToString(buffer, "latest_build_num.txt", &sz);
-        if(!tmp) {
+        if (!tmp) {
             fail = true;
         } else {
             std::string num_str = std::string(tmp);
@@ -3364,7 +3512,7 @@ void futurerestore::checkForUpdates() {
         }
     }
     const char *tmp = extractZipFileToString(buffer, "latest_build_sha.txt", &sz2);
-    if(!tmp) {
+    if (!tmp) {
         fail = true;
     } else {
         std::string sha_str = std::string(tmp);
@@ -3375,13 +3523,13 @@ void futurerestore::checkForUpdates() {
         }
     }
 
-    if(this->latest_num.empty() || this->latest_sha.empty() || fail) {
+    if (this->latest_num.empty() || this->latest_sha.empty() || fail) {
         info("ERROR: failed to check for futurerestore updates! continuing...\n");
         return;
     }
     bool updated = false;
-    if(std::equal(this->current_sha.begin(), this->current_sha.end(), this->latest_sha.begin())) {
-       updated = true;
+    if (std::equal(this->current_sha.begin(), this->current_sha.end(), this->latest_sha.begin())) {
+        updated = true;
     } else {
         if (std::stoi(this->current_num) < std::stoi(this->latest_num)) {
             info("Error: Futurerestore is outdated! Please download the latest futurerestore! exitting...\n");
@@ -3390,7 +3538,7 @@ void futurerestore::checkForUpdates() {
             updated = true;
         }
     }
-    if(updated) {
+    if (updated) {
         info("Futurerestore is up to date!\n");
     }
 }
@@ -3402,34 +3550,34 @@ const char *futurerestore::extractZipFileToString(char *zip_buffer, const char *
     zip_error_t *err = nullptr;
     unsigned char *target_buffer = nullptr;
     zip_source_t *target_source_zip = zip_source_buffer_create(zip_buffer, *sz, 0, err);
-    if(err != nullptr) {
+    if (err != nullptr) {
         return nullptr;
     }
-    if(target_source_zip == nullptr) {
+    if (target_source_zip == nullptr) {
         return nullptr;
     }
     zip_t *target_zip = zip_open_from_source(target_source_zip, 0, err);
-    if(err != nullptr) {
+    if (err != nullptr) {
         info("err: %d %s\n", __LINE__, zip_error_strerror(err));
     }
-    if(target_zip == nullptr) {
+    if (target_zip == nullptr) {
         return nullptr;
     } else {
         size_t idx = zip_name_locate(target_zip, file, 0);
-        if(idx < 0) {
+        if (idx < 0) {
             return nullptr;
         } else {
             struct zip_stat zstat{0};
             zip_stat_init(&zstat);
-            if(zip_stat_index(target_zip, idx, 0, &zstat) != 0) {
+            if (zip_stat_index(target_zip, idx, 0, &zstat) != 0) {
                 return nullptr;
             } else {
-                struct zip_file* target_file = zip_fopen_index(target_zip, idx, 0);
+                struct zip_file *target_file = zip_fopen_index(target_zip, idx, 0);
                 if (target_file == nullptr) {
                     return nullptr;
                 } else {
-                    target_buffer = (unsigned char*)alloc.allocate(zstat.size+1);
-                    if(target_buffer == nullptr) {
+                    target_buffer = (unsigned char *)alloc.allocate(zstat.size + 1);
+                    if (target_buffer == nullptr) {
                         return nullptr;
                     } else {
                         if (zip_fread(target_file, target_buffer, zstat.size) != zstat.size) {
@@ -3449,10 +3597,10 @@ const char *futurerestore::extractZipFileToString(char *zip_buffer, const char *
 
 bool futurerestore::is32bit() const {
     bool ret = !is_image4_supported(_client);
-    if(_client) {
+    if (_client) {
         dfu_client_free(_client);
     }
-    if(_client) {
+    if (_client) {
         recovery_client_free(_client);
     }
     getDeviceMode(true);
