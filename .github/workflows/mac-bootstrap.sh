@@ -17,26 +17,18 @@ download_with_retry() {
 
     while [ $attempt -le $max_attempts ]; do
         echo "Attempt $attempt: Downloading $filename..."
-        # Try with different curl options to handle SSL issues
-        if curl -f -L --retry 2 --retry-delay 3 --connect-timeout 30 --max-time 300 -o "$filename" "$url"; then
+        # Use --insecure to bypass SSL certificate issues
+        if curl -f -L --insecure --retry 2 --retry-delay 3 --connect-timeout 30 --max-time 300 -o "$filename" "$url"; then
             echo "✓ Successfully downloaded $filename"
             return 0
         else
             echo "✗ Failed to download $filename (attempt $attempt/$max_attempts)"
-            # Try with insecure SSL as fallback
-            if [ $attempt -eq 2 ]; then
-                echo "Retrying with relaxed SSL verification..."
-                if curl -f -L -k --retry 2 --retry-delay 3 --connect-timeout 30 --max-time 300 -o "$filename" "$url"; then
-                    echo "✓ Successfully downloaded $filename (with relaxed SSL)"
-                    return 0
-                fi
-            fi
             if [ $attempt -eq $max_attempts ]; then
                 echo "Error: Failed to download $filename after $max_attempts attempts"
                 return 1
             fi
             attempt=$((attempt + 1))
-            sleep 5
+            sleep 2
         fi
     done
 }

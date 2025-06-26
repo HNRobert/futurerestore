@@ -44,7 +44,11 @@ jobs:
             echo "/opt/homebrew/bin" >> $GITHUB_PATH
             export PATH="/opt/homebrew/bin:$PATH"
           fi
-          brew install zstd gnu-tar
+          brew install curl zstd gnu-tar
+          # Use the new curl in PATH
+          brew link curl --force
+          echo 'export PATH="/opt/homebrew/opt/curl/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
       - name: macOS Build
         id: macOS-Build
         run: |
