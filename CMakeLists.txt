@@ -7,7 +7,7 @@ option(NO_PKGCFG "Disable pkgconfig searching of libs, use dep_root for linking"
 
 project(futurerestore VERSION 2.0.0 LANGUAGES C CXX)
 
-if(ARCH STREQUAL "")
+if(NOT DEFINED ARCH OR ARCH STREQUAL "")
     set(ARCH "${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
@@ -34,10 +34,10 @@ if("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "Darwin")
     endif()
     set(PROJECT_CXX_FLAGS "${PROJECT_C_FLAGS}")
 elseif("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "Linux")
-    set(PROJECT_C_FLAGS "-arch ${ARCH} -Wl,--allow-multiple-definition -pthread -mrelax-all -Wno-deprecated-declarations -Wno-int-conversion")
+    set(PROJECT_C_FLAGS "-Wl,--allow-multiple-definition -pthread -mrelax-all -Wno-deprecated-declarations -Wno-int-conversion")
     set(PROJECT_CXX_FLAGS "${PROJECT_C_FLAGS}")
 elseif("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "MSYS" OR "${CMAKE_HOST_SYSTEM_NAME}" MATCHES "Windows")
-    set(PROJECT_C_FLAGS "-arch ${ARCH} -Wl,--allow-multiple-definition -pthread -fPIC -Wno-deprecated-declarations -Wno-int-conversion -DCURL_STATICLIB -Bstatic -O0")
+    set(PROJECT_C_FLAGS "-Wl,--allow-multiple-definition -pthread -fPIC -Wno-deprecated-declarations -Wno-int-conversion -DCURL_STATICLIB -Bstatic -O0")
     set(PROJECT_CXX_FLAGS "${PROJECT_C_FLAGS}")
 endif()
 if(ASAN)
