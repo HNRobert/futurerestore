@@ -12,20 +12,21 @@ if(NOT NO_PKGCFG)
     pkg_check_modules(DEPS REQUIRED
             libzip
             zlib
-            libpng16
             libcrypto
             libssl
             libplist-2.0
             libimobiledevice-glue-1.0
+            libtatsu
             libimobiledevice-1.0
             libirecovery-1.0
             libusbmuxd-2.0
             libgeneral
             libcurl
             libfragmentzip
+            libimg3tool
             libimg4tool
             libinsn
-            liboffsetfinder64
+            libpatchfinder
             libipatcher)
     target_include_directories(futurerestore PRIVATE "${DEPS_INCLUDE_DIRS}")
     target_link_directories(futurerestore PRIVATE "${DEPS_LIBRARY_DIRS}")
@@ -35,27 +36,25 @@ else()
             "${CMAKE_SOURCE_DIR}/dep_root/include")
     target_link_directories(futurerestore PRIVATE
             "${CMAKE_SOURCE_DIR}/dep_root/lib"
-            "${CMAKE_SOURCE_DIR}/dep_root/lib/xpwn"
             )
     target_link_libraries(futurerestore PRIVATE
             z
             zip
-            png16
             crypto
             ssl
             "-lgeneral"
             plist-2.0
             fragmentzip
+            img3tool
             img4tool
-            common
-            xpwn
             insn
-            offsetfinder64
+            patchfinder
             ipatcher
             tsschecker
             idevicerestore
             jssy
             curl
+            tatsu
             imobiledevice-glue-1.0
             imobiledevice-1.0
             irecovery-1.0
@@ -77,15 +76,14 @@ elseif("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "MSYS" OR "${CMAKE_HOST_SYSTEM_NAME}"
                 jssy
                 "-lgeneral"
                 fragmentzip
+                img3tool
                 img4tool
                 lzfse
                 ipatcher
-                offsetfinder64
+                patchfinder
                 insn
-                xpwn
-                common
-                png16
                 irecovery-1.0
+                tatsu
                 imobiledevice-1.0
                 usbmuxd-2.0
                 imobiledevice-glue-1.0

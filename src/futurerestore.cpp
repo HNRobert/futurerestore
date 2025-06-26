@@ -8,7 +8,6 @@
 
 #include <libgeneral/macros.h>
 #include <libgen.h>
-#include <unistd.h>
 #include <zlib.h>
 #include <utility>
 #include <fstream>
@@ -156,6 +155,7 @@ using namespace tihmstar;
 extern "C" {
 void irecv_event_cb(const irecv_device_event_t *event, void *userdata);
 void idevice_event_cb(const idevice_event_t *event, void *userdata);
+int received_cb(irecv_client_t client, const irecv_event_t* event);
 }
 
 #pragma mark futurerestore
@@ -324,14 +324,15 @@ plist_t futurerestore::nonceMatchesApTickets() {
     }
 
     unsigned char *realnonce;
-    unsigned int realNonceSize = 0;
+    int realNonceSize = 0;
     if (_rerestoreiOS9) {
         info("Skipping ApNonce check\n");
     } else {
         recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
 
         info("Got ApNonce from device: ");
-        for (unsigned int i = 0; i < realNonceSize; i++) {
+        int i = 0;
+        for (i = 0; i < realNonceSize; i++) {
             info("%02x ", ((unsigned char *) realnonce)[i]);
         }
         info("\n");
@@ -436,7 +437,7 @@ void futurerestore::waitForNonce(std::vector<const char *> nonces, size_t nonceS
 
         recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
         info("Got ApNonce from device: ");
-        for (unsigned int i = 0; i < realNonceSize; i++) {
+        for (int i = 0; i < realNonceSize; i++) {
             info("%02x ", realnonce[i]);
         }
         info("\n");
@@ -594,12 +595,8 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
     reterror("compiled without libipatcher");
 #else
     idevicerestore_mode_t *mode = nullptr;
-    
-    // Dummy structures for when libipatcher is not available
-    struct dummy_fw_key { int dummy; };
-    dummy_fw_key iBSSKeys{};
-    dummy_fw_key iBECKeys{};
-    
+    libipatcher::fw_key iBSSKeys{};
+    libipatcher::fw_key iBECKeys{};
     std::pair<ptr_smart<char *>, size_t> iBSS;
     std::pair<ptr_smart<char *>, size_t> iBEC;
     FILE *ibss = nullptr;
@@ -646,7 +643,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             fseek(ibss, 0, SEEK_END);
             iBSS.second = ftell(ibss);
             fseek(ibss, 0, SEEK_SET);
-            retassure(iBSS.first = (char *)alloc.allocate(iBSS.second), "failed to allocate memory for Rose\n");
+            retassure(iBSS.first = (char *)alloc.allocate(iBSS.second), "failed to allocate memory for iBSS\n");
             size_t freadRet = 0;
             retassure((freadRet = fread((char *) iBSS.first, 1, iBSS.second, ibss)) == iBSS.second,
                       "failed to load iBSS. size=%zu but fread returned %zu\n", iBSS.second, freadRet);
@@ -658,7 +655,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             fseek(ibec, 0, SEEK_END);
             iBEC.second = ftell(ibec);
             fseek(ibec, 0, SEEK_SET);
-            retassure(iBEC.first = (char *)alloc.allocate(iBEC.second), "failed to allocate memory for Rose\n");
+            retassure(iBEC.first = (char *)alloc.allocate(iBEC.second), "failed to allocate memory for iBEC\n");
             size_t freadRet = 0;
             retassure((freadRet = fread((char *) iBEC.first, 1, iBEC.second, ibec)) == iBEC.second,
                       "failed to load iBEC. size=%zu but fread returned %zu\n", iBEC.second, freadRet);
@@ -672,22 +669,19 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         try {
             std::string board = getDeviceBoardNoCopy();
             info("Getting firmware keys for: %s\n", board.c_str());
-            if (board == "n71ap" || board == "n71map" || board == "n69ap" || board == "n69uap" || board == "n66ap" ||
-                board == "n66map") {
+            if (board == "n71ap" || board == "n71map" || board == "n69ap" || board == "n69uap" || board == "n66ap" || board == "n66map") {
                 if (!_noIBSS && !cache1) {
-                    iBSSKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBSS",
-                                                           board);
+                    iBSSKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBSS", 0, board);
                 }
                 if (!cache2) {
-                    iBECKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBEC",
-                                                           board);
+                  iBECKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBEC", 0, board);
                 }
             } else {
                 if (!_noIBSS && !cache1) {
-                    iBSSKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBSS");
+                    iBSSKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBSS", 0);
                 }
                 if (!cache2) {
-                    iBECKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBEC");
+                    iBECKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBEC", 0);
                 }
             }
         } catch (tihmstar::exception &e) {
@@ -829,7 +823,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         retassure(((recovery_client_new(_client) == IRECV_E_SUCCESS) ||
                    (mutex_unlock(&_client->device_event_mutex), 0)),
                   "Failed to connect to device in Recovery Mode!");
-        if (get_ap_nonce(_client, &_client->nonce, (unsigned int*)&_client->nonce_size) < 0) {
+        if (get_ap_nonce(_client, &_client->nonce, &_client->nonce_size) < 0) {
             reterror("Failed to get apnonce from device!");
         }
 
@@ -878,7 +872,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Failed to connect to device in Recovery Mode after ApNonce hax!");
             printf("APnonce post-hax:\n");
-            if (get_ap_nonce(_client, &_client->nonce, (unsigned int*)&_client->nonce_size) < 0) {
+            if (get_ap_nonce(_client, &_client->nonce, &_client->nonce_size) < 0) {
                 reterror("Failed to get apnonce from device!");
             }
             assure(!irecv_send_command(_client->recovery->client, "bgcolor 255 255 0"));
@@ -950,6 +944,102 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
 #endif //HAVE_LIBIPATCHER
 }
 
+void futurerestore::patchKernel(plist_t build_identity, std::string custom_seed) {
+#ifndef HAVE_LIBIPATCHER
+    reterror("compiled without libipatcher");
+#else
+    libipatcher::fw_key kernelKeys{};
+    libipatcher::fw_key iBECKeys{};
+    std::pair<ptr_smart<char *>, size_t> kernel;
+    FILE *kernel_f = nullptr;
+    int rv;
+    bool cache = false;
+    std::string img3_end(".patched.img3");
+    std::string img4_end(".patched.im4p");
+    std::string kernel_name(futurerestoreTempPath + "/kernel.");
+
+    getDeviceMode(true);
+    kernel_name.append(getDeviceBoardNoCopy());
+    kernel_name.append(".");
+    kernel_name.append(_client->build);
+    if (_client->image4supported) {
+      kernel_name.append(img4_end);
+    } else {
+      kernel_name.append(img3_end);
+    }
+    std::allocator<uint8_t> alloc;
+    if (!_noCache) {
+      kernel_f = fopen(kernel_name.c_str(), "rb");
+      if (kernel_f) {
+        fseek(kernel_f, 0, SEEK_END);
+        kernel.second = ftell(kernel_f);
+        fseek(kernel_f, 0, SEEK_SET);
+        retassure(kernel.first = (char *)alloc.allocate(kernel.second), "failed to allocate memory for kernel\n");
+        size_t freadRet = 0;
+        retassure((freadRet = fread((char *) kernel.first, 1, kernel.second, kernel_f)) == kernel.second,
+                  "failed to load kernel. size=%zu but fread returned %zu\n", kernel.second, freadRet);
+        fclose(kernel_f);
+        cache = true;
+        }
+    }
+
+    /* Patch kernel */
+    if (!cache) {
+      if (_client->build_major < 14) {
+        try {
+          std::string board = getDeviceBoardNoCopy();
+          info("Getting firmware keys for: %s\n", board.c_str());
+          if (board == "n71ap" || board == "n71map" || board == "n69ap" ||
+              board == "n69uap" || board == "n66ap" || board == "n66map") {
+            if (!cache) {
+              kernelKeys = libipatcher::getFirmwareKeyForComponent(
+                  _client->device->product_type, _client->build, "KernelCache",
+                  _client->device->chip_id, board);
+            }
+          } else {
+            if (!cache) {
+              kernelKeys = libipatcher::getFirmwareKeyForComponent(
+                  _client->device->product_type, _client->build, "KernelCache",
+                  _client->device->chip_id);
+            }
+          }
+        } catch (tihmstar::exception &e) {
+          reterror("getting keys failed with error: %d (%s). Are keys publicly available?",
+                   e.code(), e.what());
+        }
+      }
+      if (!kernel.first) {
+        info("Patching kernel\n");
+        if(_client->kerneldata && _client->kerneldatasize) {
+          kernel = std::make_pair(_client->kerneldata, _client->kerneldatasize);
+        } else {
+          kernel = getIPSWComponent(_client, build_identity, "KernelCache");
+        }
+        kernel = std::move(libipatcher::patchKernel(
+            (char *)kernel.first, kernel.second, kernelKeys, custom_seed));
+      }
+    }
+
+//    if (_client->image4supported) {
+//        /* if this is 64-bit, we need to back IM4P to IMG4
+//           also due to the nature of iBoot64Patchers sigpatches we need to stich a valid signed im4m to it (but nonce is ignored) */
+//        if (!cache) {
+//            info("Repacking patched kernel as IMG4\n");
+//            kernel = std::move(libipatcher::packIM4PToIMG4(kernel.first, kernel.second, _im4ms[0].first, _im4ms[0].second));
+//        }
+//    }
+
+    retassure(kernel_f = fopen(kernel_name.c_str(), "wb"), "can't save patched kernel at %s\n", kernel_name.c_str());
+    retassure(rv = fwrite(kernel.first, kernel.second, 1, kernel_f), "can't save patched kernel at %s\n", kernel_name.c_str());
+    fflush(kernel_f);
+    fclose(kernel_f);
+
+    _client->kerneldatasize = kernel.second;
+    _client->kerneldata = (char *)alloc.allocate(_client->kerneldatasize);
+    memcpy(_client->kerneldata, kernel.first, kernel.second);
+#endif //HAVE_LIBIPATCHER
+}
+
 void get_custom_component(struct idevicerestore_client_t *client, plist_t build_identity, const char *component,
                           unsigned char **data, unsigned int *size) {
 #ifndef HAVE_LIBIPATCHER
@@ -957,9 +1047,9 @@ void get_custom_component(struct idevicerestore_client_t *client, plist_t build_
 #else
     try {
         auto comp = getIPSWComponent(client, build_identity, component);
-        comp = std::move(libipatcher::decryptFile3((char *) comp.first, comp.second,
-                                              libipatcher::getFirmwareKey(client->device->product_type, client->build,
-                                                                          component)));
+        comp = std::move(libipatcher::decryptFile((char *) comp.first, comp.second,
+                                              libipatcher::getFirmwareKeyForComponent(client->device->product_type, client->build,
+                                                                          component, client->device->chip_id)));
         *data = (unsigned char *) (char *) comp.first;
         *size = comp.second;
         comp.first = NULL; //don't free on destruction
@@ -978,13 +1068,11 @@ void futurerestore::doRestore(const char *ipsw) {
         info("Cleaning up...\n");
         safeFreeCustom(buildmanifest, plist_free);
         if (delete_fs && filesystem) unlink(filesystem);
-        if (client->ipsw) ipsw_close(client->ipsw);
     });
     struct idevicerestore_client_t *client = _client;
     plist_t build_identity = nullptr;
 
-    client->ipsw = ipsw_open(ipsw);
-    retassure(client->ipsw, "ERROR: Failed to open IPSW file %s\n", ipsw);
+    client->ipsw = strdup(ipsw);
     if (_noRestore) client->flags |= FLAG_NO_RESTORE;
     if (_noRSEP) client->flags |= FLAG_NO_RSEP;
     if (!_isUpdateInstall) client->flags |= FLAG_ERASE;
@@ -1016,14 +1104,14 @@ void futurerestore::doRestore(const char *ipsw) {
 
     info("Identified device as %s, %s\n", getDeviceBoardNoCopy(), getDeviceModelNoCopy());
 
-    retassure(!access(ipsw, F_OK), "ERROR: Firmware file %s does not exist.\n",
-              ipsw); // verify if ipsw file exists
+    retassure(!access(client->ipsw, F_OK), "ERROR: Firmware file %s does not exist.\n",
+              client->ipsw); // verify if ipsw file exists
 
     info("Extracting BuildManifest from iPSW\n");
     {
         int unused;
         retassure(!ipsw_extract_build_manifest(client->ipsw, &buildmanifest, &unused),
-                  "ERROR: Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", ipsw);
+                  "ERROR: Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", client->ipsw);
     }
     client->build_manifest = plist_copy(buildmanifest);
 
@@ -1148,7 +1236,12 @@ void futurerestore::doRestore(const char *ipsw) {
             }
         } else {
             if (!img4tool::isIM4MSignatureValid({im4m.first, im4m.second})) {
-                info("IM4M signature is not valid!\n");
+                if (_skipBlob) {
+                  info("[WARNING] NOT VALIDATING SHSH BLOBS!\n");
+                } else {
+                  info("IM4M signature is not valid!\n");
+                  reterror("APTicket can't be used for this restore\n");
+                }
             }
             info("Verified APTicket to be valid for this restore\n");
         }
@@ -1229,38 +1322,49 @@ void futurerestore::doRestore(const char *ipsw) {
 
     //check for enterpwnrecovery, because we Could be in DFU mode
     if (_enterPwnRecoveryRequested) {
-        retassure((getDeviceMode(true) == _MODE_DFU) || (getDeviceMode(false) == _MODE_RECOVERY && _noIBSS),
-                  "unexpected device mode\n");
-        if(client->irecv_e_ctx) {
-            irecv_device_event_unsubscribe(client->irecv_e_ctx);
+      retassure((getDeviceMode(true) == _MODE_DFU) ||
+                    (getDeviceMode(false) == _MODE_RECOVERY && _noIBSS),
+                "unexpected device mode\n");
+      if (client->irecv_e_ctx) {
+        irecv_device_event_unsubscribe(client->irecv_e_ctx);
+      }
+      if (client->idevice_e_ctx != nullptr) {
+        client->idevice_e_ctx = nullptr;
+      }
+      std::string bootargs;
+      if (_boot_args != nullptr) {
+        bootargs = _boot_args;
+      } else {
+        if (_serial) {
+          bootargs.append("serial=0x3 ");
         }
-        if(client->idevice_e_ctx != nullptr) {
-            client->idevice_e_ctx = nullptr;
+        bootargs.append("rd=md0 ");
+        if (!_isUpdateInstall) {
+          bootargs.append("nand-enable-reformat=0x1 ");
         }
-        std::string bootargs;
-        if (_boot_args != nullptr) {
-            bootargs = _boot_args;
-        } else {
-            if (_serial) {
-                bootargs.append("serial=0x3 ");
-            }
-            bootargs.append("rd=md0 ");
-            if (!_isUpdateInstall) {
-                bootargs.append("nand-enable-reformat=0x1 ");
-            }
-            bootargs.append(
-                    "-v -restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+        bootargs.append(
+            "-restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+      }
+      auto custom_seed = std::getenv("FUTURERESTORE_CUSTOM_CRYPTEX_SEED");
+      if(_client->build_major > 19) {
+        if (custom_seed) {
+          if(strlen(custom_seed) >= 32 ) {
+            patchKernel(build_identity, custom_seed);
+          } else {
+            patchKernel(build_identity, "0x11111111111111111111111111111111");
+          }
         }
-        enterPwnRecovery(build_identity, bootargs);
-        if(_client->irecv_e_ctx) {
-            irecv_device_event_unsubscribe(_client->irecv_e_ctx);
-        }
-        if(_client->idevice_e_ctx != nullptr) {
-            _client->idevice_e_ctx = nullptr;
-        }
-        irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, _client);
-        idevice_event_subscribe(idevice_event_cb, client);
-        client->idevice_e_ctx = (void *) idevice_event_cb;
+      }
+      enterPwnRecovery(build_identity, bootargs);
+      if(_client->irecv_e_ctx) {
+          irecv_device_event_unsubscribe(_client->irecv_e_ctx);
+      }
+      if(_client->idevice_e_ctx != nullptr) {
+          _client->idevice_e_ctx = nullptr;
+      }
+      irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, _client);
+      idevice_event_subscribe(idevice_event_cb, client);
+      client->idevice_e_ctx = (void *) idevice_event_cb;
     }
 
     // Get filesystem name from build identity
@@ -1287,11 +1391,11 @@ void futurerestore::doRestore(const char *ipsw) {
         }
         strcpy(tmpf, client->cache_dir);
         strcat(tmpf, "/");
-        char *ipswtmp = strdup(ipsw);
+        char *ipswtmp = strdup(client->ipsw);
         strcat(tmpf, basename(ipswtmp));
         free(ipswtmp);
     } else {
-        strcpy(tmpf, ipsw);
+        strcpy(tmpf, client->ipsw);
     }
     char *p = strrchr(tmpf, '.');
     if (p) {
@@ -1467,8 +1571,8 @@ void futurerestore::doRestore(const char *ipsw) {
     retassure(client->mode == MODE_RECOVERY, "failed to reconnect to device in recovery (iBEC) mode\n");
 
     //do magic
-    if (_client->image4supported) get_sep_nonce(client, &client->sepnonce, (unsigned int*)&client->sepnonce_size);
-    get_ap_nonce(client, &client->nonce, (unsigned int*)&client->nonce_size);
+    if (_client->image4supported) get_sep_nonce(client, &client->sepnonce, &client->sepnonce_size);
+    get_ap_nonce(client, &client->nonce, &client->nonce_size);
 
     if (client->mode == MODE_RECOVERY) {
         retassure(client->srnm, "ERROR: Could not retrieve device serial number. Can't continue.\n");
@@ -1479,8 +1583,12 @@ void futurerestore::doRestore(const char *ipsw) {
             info("[WARNING] Setting bgcolor to green! If you don't see a green screen, then your device didn't boot iBEC correctly\n");
             sleep(2); //show the user a green screen!
         }
-
-        retassure(!recovery_enter_restore(client, build_identity), "ERROR: Unable to place device into restore mode\n");
+        irecv_event_subscribe(client->recovery->client, IRECV_RECEIVED, &received_cb, nullptr);
+        auto tmpRet = recovery_enter_restore(client, build_identity);
+        if(tmpRet) {
+          irecv_receive(client->recovery->client);
+        }
+        retassure(!tmpRet, "ERROR: Unable to place device into restore mode\n");
 
         recovery_client_free(client);
     }
@@ -1500,7 +1608,7 @@ void futurerestore::doRestore(const char *ipsw) {
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");
-    int result = restore_device(client, build_identity);
+    int result = restore_device(client, build_identity, filesystem);
     if (result == 2) return;
     else retassure(!(result), "ERROR: Unable to restore device\n");
 }
@@ -2560,32 +2668,33 @@ void futurerestore::downloadLatestCryptex1() {
 }
 
 void futurerestore::downloadLatestFirmwareComponents() {
-    info("Downloading the latest firmware components...\n");
-    char *manifeststr = getLatestManifest();
-    if (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestRose();
-    if (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestSE();
-    if (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
-        elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)) {
-        downloadLatestSavage();
-    }
-    if (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) ||
-        elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestVeridian();
-    if (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestTimer();
-    if (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestBaobab();
-    if (elemExists("Yonkers,PatchEpoch", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestYonkers();
-    if (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0))
-        downloadLatestCryptex1();
-    info("Finished downloading the latest firmware components!\n");
+    info("Downloading the latest firmware components...?\n");
+    // char *manifeststr = getLatestManifest();
+    // if (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestRose();
+    // if (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestSE();
+    // if (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) &&
+    //     elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)) {
+    //     downloadLatestSavage();
+    // }
+    // if (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) ||
+    //     elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestVeridian();
+    // if (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestTimer();
+    // if (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestBaobab();
+    // if (elemExists("Yonkers,PatchEpoch", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestYonkers();
+    // const char *disableLatest = std::getenv("IDR_DISABLE_LATEST_CRYPTEX");
+    // if(!disableLatest && elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0))
+    //     downloadLatestCryptex1();
+    // info("Finished downloading the latest firmware components!\n");
 }
 
 void futurerestore::downloadLatestBaseband() {
