@@ -34,10 +34,17 @@ jobs:
         uses: jwlawson/actions-setup-cmake@v1.14
         with:
           cmake-version: "3.23.2"
-      - name: Install GNU tar
-        id: Install-GNU-tar
+      - name: Setup build tools
+        id: Setup-build-tools
         run: |
-          brew install gnu-tar
+          # Install zstd and gnu-tar via homebrew
+          if ! command -v brew &> /dev/null; then
+            echo "Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            echo "/opt/homebrew/bin" >> $GITHUB_PATH
+            export PATH="/opt/homebrew/bin:$PATH"
+          fi
+          brew install zstd gnu-tar
       - name: macOS Build
         id: macOS-Build
         run: |
