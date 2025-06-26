@@ -45,8 +45,17 @@ fi
 if [ -f "linux_fix.tar.zst" ]; then
     tar xf linux_fix.tar.zst -C ${TMPDIR}/Builder &
 fi
+echo "Installing CMake 3.23.2..."
 tar xf cmake-3.23.2-linux-x86_64.tar.gz
-cp -RpP cmake-3.23.2-linux-x86_64/* /usr/local/ || true
+# Install CMake to a specific location and update PATH
+mkdir -p /usr/local/cmake
+cp -RpP cmake-3.23.2-linux-x86_64/* /usr/local/cmake/ || true
+# Make sure new cmake is in PATH
+export PATH="/usr/local/cmake/bin:$PATH"
+echo "CMake version check:"
+/usr/local/cmake/bin/cmake --version
+# Create symlink to ensure cmake command works
+ln -sf /usr/local/cmake/bin/cmake /usr/local/bin/cmake
 wait
 rm -rf *.zst *.gz cmake-* llvm.sh
 cd ${WORKFLOW_ROOT}

@@ -5,12 +5,15 @@ export TMPDIR=/tmp
 export WORKFLOW_ROOT=${TMPDIR}/Builder/repos/futurerestore/.github/workflows
 export DEP_ROOT=${TMPDIR}/Builder/repos/futurerestore/dep_root
 export BASE=${TMPDIR}/Builder/repos/futurerestore/
+# Ensure we use the correct CMake version
+export PATH="/usr/local/cmake/bin:$PATH"
+echo "Using CMake version: $(cmake --version | head -1)"
 
 cd ${BASE}
 # Check if we have static dependencies or need to use system packages
 if [ -d "${DEP_ROOT}/Linux_x86_64_Release/lib" ] && [ -d "${DEP_ROOT}/Linux_x86_64_Release/include" ]; then
     echo "Using static dependencies"
-    ln -sf ${DEP_ROOT}/Linux_x86_64_Release/{lib/,include/}  ${DEP_ROOT}/
+    ln -sf ${DEP_ROOT}/Linux_x86_64_Release/{lib/,include/} ${DEP_ROOT}/
     CMAKE_FLAGS="-DNO_PKGCFG=ON"
 else
     echo "Using system dependencies"

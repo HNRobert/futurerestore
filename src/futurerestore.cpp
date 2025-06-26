@@ -8,6 +8,7 @@
 
 #include <libgeneral/macros.h>
 #include <libgen.h>
+#include <unistd.h>
 #include <zlib.h>
 #include <utility>
 #include <fstream>
@@ -323,15 +324,14 @@ plist_t futurerestore::nonceMatchesApTickets() {
     }
 
     unsigned char *realnonce;
-    int realNonceSize = 0;
+    unsigned int realNonceSize = 0;
     if (_rerestoreiOS9) {
         info("Skipping ApNonce check\n");
     } else {
         recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
 
         info("Got ApNonce from device: ");
-        int i = 0;
-        for (i = 0; i < realNonceSize; i++) {
+        for (unsigned int i = 0; i < realNonceSize; i++) {
             info("%02x ", ((unsigned char *) realnonce)[i]);
         }
         info("\n");
@@ -436,7 +436,7 @@ void futurerestore::waitForNonce(std::vector<const char *> nonces, size_t nonceS
 
         recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
         info("Got ApNonce from device: ");
-        for (int i = 0; i < realNonceSize; i++) {
+        for (unsigned int i = 0; i < realNonceSize; i++) {
             info("%02x ", realnonce[i]);
         }
         info("\n");
@@ -594,8 +594,12 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
     reterror("compiled without libipatcher");
 #else
     idevicerestore_mode_t *mode = nullptr;
-    libipatcher::fw_key iBSSKeys{};
-    libipatcher::fw_key iBECKeys{};
+    
+    // Dummy structures for when libipatcher is not available
+    struct dummy_fw_key { int dummy; };
+    dummy_fw_key iBSSKeys{};
+    dummy_fw_key iBECKeys{};
+    
     std::pair<ptr_smart<char *>, size_t> iBSS;
     std::pair<ptr_smart<char *>, size_t> iBEC;
     FILE *ibss = nullptr;
@@ -825,7 +829,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         retassure(((recovery_client_new(_client) == IRECV_E_SUCCESS) ||
                    (mutex_unlock(&_client->device_event_mutex), 0)),
                   "Failed to connect to device in Recovery Mode!");
-        if (get_ap_nonce(_client, &_client->nonce, &_client->nonce_size) < 0) {
+        if (get_ap_nonce(_client, &_client->nonce, (unsigned int*)&_client->nonce_size) < 0) {
             reterror("Failed to get apnonce from device!");
         }
 
@@ -874,7 +878,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Failed to connect to device in Recovery Mode after ApNonce hax!");
             printf("APnonce post-hax:\n");
-            if (get_ap_nonce(_client, &_client->nonce, &_client->nonce_size) < 0) {
+            if (get_ap_nonce(_client, &_client->nonce, (unsigned int*)&_client->nonce_size) < 0) {
                 reterror("Failed to get apnonce from device!");
             }
             assure(!irecv_send_command(_client->recovery->client, "bgcolor 255 255 0"));
@@ -974,11 +978,13 @@ void futurerestore::doRestore(const char *ipsw) {
         info("Cleaning up...\n");
         safeFreeCustom(buildmanifest, plist_free);
         if (delete_fs && filesystem) unlink(filesystem);
+        if (client->ipsw) ipsw_close(client->ipsw);
     });
     struct idevicerestore_client_t *client = _client;
     plist_t build_identity = nullptr;
 
-    client->ipsw = strdup(ipsw);
+    client->ipsw = ipsw_open(ipsw);
+    retassure(client->ipsw, "ERROR: Failed to open IPSW file %s\n", ipsw);
     if (_noRestore) client->flags |= FLAG_NO_RESTORE;
     if (_noRSEP) client->flags |= FLAG_NO_RSEP;
     if (!_isUpdateInstall) client->flags |= FLAG_ERASE;
@@ -1010,14 +1016,14 @@ void futurerestore::doRestore(const char *ipsw) {
 
     info("Identified device as %s, %s\n", getDeviceBoardNoCopy(), getDeviceModelNoCopy());
 
-    retassure(!access(client->ipsw, F_OK), "ERROR: Firmware file %s does not exist.\n",
-              client->ipsw); // verify if ipsw file exists
+    retassure(!access(ipsw, F_OK), "ERROR: Firmware file %s does not exist.\n",
+              ipsw); // verify if ipsw file exists
 
     info("Extracting BuildManifest from iPSW\n");
     {
         int unused;
         retassure(!ipsw_extract_build_manifest(client->ipsw, &buildmanifest, &unused),
-                  "ERROR: Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", client->ipsw);
+                  "ERROR: Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", ipsw);
     }
     client->build_manifest = plist_copy(buildmanifest);
 
@@ -1281,11 +1287,11 @@ void futurerestore::doRestore(const char *ipsw) {
         }
         strcpy(tmpf, client->cache_dir);
         strcat(tmpf, "/");
-        char *ipswtmp = strdup(client->ipsw);
+        char *ipswtmp = strdup(ipsw);
         strcat(tmpf, basename(ipswtmp));
         free(ipswtmp);
     } else {
-        strcpy(tmpf, client->ipsw);
+        strcpy(tmpf, ipsw);
     }
     char *p = strrchr(tmpf, '.');
     if (p) {
@@ -1461,8 +1467,8 @@ void futurerestore::doRestore(const char *ipsw) {
     retassure(client->mode == MODE_RECOVERY, "failed to reconnect to device in recovery (iBEC) mode\n");
 
     //do magic
-    if (_client->image4supported) get_sep_nonce(client, &client->sepnonce, &client->sepnonce_size);
-    get_ap_nonce(client, &client->nonce, &client->nonce_size);
+    if (_client->image4supported) get_sep_nonce(client, &client->sepnonce, (unsigned int*)&client->sepnonce_size);
+    get_ap_nonce(client, &client->nonce, (unsigned int*)&client->nonce_size);
 
     if (client->mode == MODE_RECOVERY) {
         retassure(client->srnm, "ERROR: Could not retrieve device serial number. Can't continue.\n");
@@ -1494,7 +1500,7 @@ void futurerestore::doRestore(const char *ipsw) {
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");
-    int result = restore_device(client, build_identity, filesystem);
+    int result = restore_device(client, build_identity);
     if (result == 2) return;
     else retassure(!(result), "ERROR: Unable to restore device\n");
 }
