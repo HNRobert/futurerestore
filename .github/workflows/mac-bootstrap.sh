@@ -7,12 +7,39 @@ export BASE=/Users/runner/work/futurerestore/futurerestore/
 
 cd ${WORKFLOW_ROOT}
 echo "Downloading dependencies..."
-curl -sO https://cdn.cryptiiiic.com/bootstrap/bootstrap_x86_64.tar.zst &
-curl -sO https://cdn.cryptiiiic.com/deps/static/macOS/x86_64/macOS_x86_64_Release_Latest.tar.zst &
-curl -sO https://cdn.cryptiiiic.com/deps/static/macOS/arm64/macOS_arm64_Release_Latest.tar.zst &
-curl -sO https://cdn.cryptiiiic.com/deps/static/macOS/x86_64/macOS_x86_64_Debug_Latest.tar.zst &
-curl -sO https://cdn.cryptiiiic.com/deps/static/macOS/arm64/macOS_arm64_Debug_Latest.tar.zst &
+
+# Function to download with retry
+download_with_retry() {
+    local url=$1
+    local filename=$2
+    local max_attempts=3
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        echo "Attempt $attempt: Downloading $filename..."
+        if curl -f -L -o "$filename" "$url"; then
+            echo "✓ Successfully downloaded $filename"
+            return 0
+        else
+            echo "✗ Failed to download $filename (attempt $attempt/$max_attempts)"
+            if [ $attempt -eq $max_attempts ]; then
+                echo "Error: Failed to download $filename after $max_attempts attempts"
+                return 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 2
+        fi
+    done
+}
+
+# Download files with retry mechanism
+download_with_retry "https://cdn.cryptiiiic.com/bootstrap/bootstrap_x86_64.tar.zst" "bootstrap_x86_64.tar.zst" &
+download_with_retry "https://cdn.cryptiiiic.com/deps/static/macOS/x86_64/macOS_x86_64_Release_Latest.tar.zst" "macOS_x86_64_Release_Latest.tar.zst" &
+download_with_retry "https://cdn.cryptiiiic.com/deps/static/macOS/arm64/macOS_arm64_Release_Latest.tar.zst" "macOS_arm64_Release_Latest.tar.zst" &
+download_with_retry "https://cdn.cryptiiiic.com/deps/static/macOS/x86_64/macOS_x86_64_Debug_Latest.tar.zst" "macOS_x86_64_Debug_Latest.tar.zst" &
+download_with_retry "https://cdn.cryptiiiic.com/deps/static/macOS/arm64/macOS_arm64_Debug_Latest.tar.zst" "macOS_arm64_Debug_Latest.tar.zst" &
 wait
+
 echo "Download complete. Checking downloaded files..."
 # Check if all required files were downloaded successfully
 REQUIRED_FILES=(
@@ -24,7 +51,13 @@ REQUIRED_FILES=(
 )
 for file in "${REQUIRED_FILES[@]}"; do
     if [ ! -f "$file" ]; then
-        echo "Error: Failed to download $file"
+        echo "Error: File $file not found after download"
+        echo "Current directory contents:"
+        ls -la
+        exit 1
+    elif [ ! -s "$file" ]; then
+        echo "Error: File $file is empty"
+        ls -la "$file"
         exit 1
     else
         echo "✓ $file downloaded successfully ($(ls -lh $file | awk '{print $5}'))"
